@@ -79,4 +79,10 @@ SET Set the Alarm system to Enabled
 DIS Disable the Alarm System
 ACK Acknowledge an alarm condition
 HOU Set the number of hours between worry pages
-LIS List .NAM.SEN.ACT.DEA.MIN.MAX.")
+LIS List  basic information about sensors
+NAM Set the Name of a sensor
+SEN Show all detail of a sensor
+ACT Set a sensor to active
+DEA Disable a sensor
+MIN Set minimum value to trigger an alert
+MAX Set maximum value to tirgger an alert
