@@ -40,10 +40,13 @@ public:
   State();
   void sysState(uint8_t);
   uint8_t sysStatus();
+  void setSysId(uint8_t);
+  uint8_t getSysId();
   void addStatus(uint8_t);
   char* upTime(char *);
   int upTime();
 private:
+  uint8_t sysId;  //master = 0, remotes 1,2,...
   int ledNoticeState = 0;
   uint8_t curState;
   uint8_t status;

@@ -8,7 +8,7 @@
 #define EDT_OFFSET -4
 #define EST_OFFSET -5
 
-//#define PHOTON_MASTER
+#define PHOTON_MASTER
 #ifndef PHOTON_MASTER
 #define PHOTON_REMOTE
 #endif
@@ -17,19 +17,20 @@
 //which configuration?  (ONLY ONE)
 //Testing Master-Remote WITH Shed as master
 #ifdef PHOTON_MASTER
-#define EE_MAGIC_CONFIG 0X06        // change this to write new test config
+#define EE_MAGIC_CONFIG 0X08        // change this to write new test config
 #define EE_MAGIC_STATE 0x9e
 #define PUSHOVER_SEND_MESSAGES      //actually send Pushover Messages
 #define WORRY_MINUTES 5             //time between follow-up notifications
 #define SHED_CONFIGURATION
-#define MCP9808_I2CADDR                0X1A     //0x1A   //A1 HIGH, A0,A2 LOW
+#define MCP9808_I2CADDR    0X1A     //0x1A   //A1 HIGH, A0,A2 LOW
 #endif
 #ifdef PHOTON_REMOTE
+#define REMOTE_SYSTEM_ID 1
 #define REMOTE_CONFIGURATION
-#define EE_MAGIC_CONFIG 0X25        // change this to write new test config
+#define EE_MAGIC_CONFIG 0X27        // change this to write new test config
 #define EE_MAGIC_STATE 0x01
-#define PUSHOVER_SEND_MESSAGES      //DEBUG?? actually send Pushover Messages
-#define WORRY_MINUTES 2             //time between follow-up notifications
+//#define PUSHOVER_SEND_MESSAGES      //DEBUG?? actually send Pushover Messages
+#define WORRY_MINUTES 5             //time between follow-up notifications
 #define MCP9808_I2CADDR                0X19
 #endif
 //bench-board test configuration
@@ -57,6 +58,7 @@
 #define TEST_SENSOR_15
 #endif
 
+#define OUTSIDE_THERMOMETER_IDX 3
 #define SENSOR_LIST_SCAN
 #define ALERT_HOURS 3               //no longer used ??
 #define LOOP_DELAY_TIME 1000        //Delay ms between loop passes
@@ -75,7 +77,7 @@
 #define MAX_MESSAGE_PER_HOUR 100    //absolute maximum of pushover messages per hour
 #define CLEARING_COUNT_MAX 60       //no. loops passes in notifying state
 #define DEVICE_TIMEOUT 1800         // HALF HOUR
-#define MAX_ALLOW_OWDEV  14         //absolute maximum of ow devices
+#define MAX_ALLOW_OWDEV  20         //absolute maximum of ow devices
 #define FMLY_IBUTTON 0x01           //NOT USED ???
 #define FMLY_2405 0x05
 #define FMLY_2406 0x12              //and FMLY_2407

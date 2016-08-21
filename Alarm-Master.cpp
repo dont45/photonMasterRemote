@@ -391,6 +391,9 @@ void Sensor::setSensorIndicator(device_t d, uint8_t indval) {
 }
 
 // return TRUE if tripped
+// TO DO: FIX reaing of MCP9808 master vs remote sensor
+// master reades device, remote just returns dev_reading
+
 bool Sensor::readSensor(device_t &d) {
     uint8_t senval;
     uint8_t sensor_priority = 0;  //reporting priority
@@ -423,6 +426,7 @@ bool Sensor::readSensor(device_t &d) {
   #endif
          senval = digitalRead(d.dev_rom[0]);
          d.dev_reading = (float)senval;
+         d.dev_last_read = Time.now();
   #ifdef SERIAL_DEBUGXX
           Serial.print(" readvalue=");
           Serial.println(senval);
@@ -434,6 +438,7 @@ bool Sensor::readSensor(device_t &d) {
           senval = p_ow->readPIOX(d.dev_rom, d.port);    //??just readPIO and use d.port
           toSetSensor = (uint8_t)d.dev_reading != senval;
           d.dev_reading = (float)senval;
+          d.dev_last_read = Time.now();
           senret = senval==d.sense;
           #ifdef SERIAL_DEBUGXX
                   Serial.print("readSensor OW_SENSOR: dev_use=");
@@ -455,9 +460,10 @@ bool Sensor::readSensor(device_t &d) {
           return senret;
           break;
       // TODO: Implement??
-      case SUB_REMOTE_ALARM:
+      case SUB_REMOTE_THERMOMETER:
+      case SUB_REMOTE_SENSOR:
           //TODO: NEED TO VALIDATE dev_last_read ??
-          return d.dev_reading > 0.1;
+          return d.dev_reading > d.alert_max;
           break;
       case SUB_OIL_GAUGE:        //demo particle.subscribe value
               //last_oil_level is updated by subscription
@@ -498,6 +504,7 @@ bool Sensor::readSensor(device_t &d) {
               // i.e. i2c address etc.  This allows multiple devices on bus
               last_temp = mcp9808.readTempF();
               d.dev_reading = last_temp;
+              d.dev_last_read = Time.now();
               // return value should  be tripped if outside temp range ??
               // report using priority of sensor ??
               if((int)last_temp <= d.alert_min) return TRUE;
@@ -517,6 +524,7 @@ bool Sensor::readSensor(device_t &d) {
               rok = p_ow->readThermometer(d.dev_rom, tempF);
               if(rok) {
                 d.dev_reading = tempF;
+                d.dev_last_read = Time.now();
             #ifdef SERIAL_DEBUG
                 Serial.print("temp Fahrenheit x100:");
                 Serial.println((int)tempF*100);
@@ -614,6 +622,22 @@ bool Alarm::clearSensorReported() {
      }
    }
    return all_clear;
+}
+
+//move it to Alarm...
+//read temperature sensor from device_list by index
+float Alarm::readTemperature(uint8_t idx) {
+  std::list<device_t>::iterator k;
+  float sen_temp = -999.0;
+  for(k=device_list.begin(); k !=device_list.end(); ++k) {
+    if(k->idx != idx) continue;
+    //NOTE, for REMOTE device, readSensor does nothing, dev_reading is already set
+    //for actual device, MCP9808 device is read and dev_reading is updated
+    sensor.readSensor(*k);
+    sen_temp = k->dev_reading;
+    break;
+  }
+  return sen_temp;
 }
 
 String Alarm::getLastTemperature() {
@@ -802,6 +826,37 @@ char* Alarm::deviceListing(char *buf) {
    return buf;
 }
 
+char* Alarm::thermometerListing(char *buf) {
+  std::list<device_t>::iterator k;
+  char temp[80];
+  buf[0]=0;
+  strcat(buf,"\\n"); //json escape line feed
+  for(k=device_list.begin(); k !=device_list.end(); ++k) {
+     if(k->dev_use != SUB_REMOTE_THERMOMETER &&
+        k->dev_use != OW_THERMOMETER &&
+        k->dev_use != MCP9808_THERMOMETER)  continue;
+     device_t sp = *k;
+     strncat(buf,sp.name,SENSOR_NAME_SIZE);
+
+     int sec_since_update = Time.now() - sp.dev_last_read;
+     /*
+     if(sec_since_update > 7200) //2 hours
+        strcat(temp," ---- ");
+     else
+        sprintf(temp,"  %4d  ",sec_since_update);
+     strcat(buf, temp);  //dev_last_read
+     */
+     String lastUpd = Time.format(sp.dev_last_read, "%I:%M%p");  //03:21AM
+     sprintf(temp," %s  %5.1fF\\n", lastUpd.c_str(), sp.dev_reading);
+     strcat(buf,temp);
+   }
+   #ifdef DEBUGXX
+   Serial.println("thermometerListing");
+   Serial.println(buf);
+   #endif
+   return buf;
+}
+
 // trippedList to String
 void Alarm::tripListString() {
   std::list<device_t>::iterator k;
@@ -854,8 +909,8 @@ uint8_t Alarm::formatRemoteTrip(char* data) {
       Serial.print("  reported=");
       Serial.println(k->reported);
     #endif
-    //if(k->tripped) {
-    if(k->dev_reading > 0.1) {
+    //check tripped based upon sensor use xxxxzz
+    if(k->dev_reading > k->alert_max) {
       if(k->tripped) sensorState = SENSOR_RESET;
       else sensorState = SENSOR_CLEAR;
     }
@@ -958,9 +1013,11 @@ bool Alarm::setAlarmRemote(uint8_t idx, float senValue) {
   bool fountIt = FALSE;
   for(k=device_list.begin(); k != device_list.end(); ++k) {
     if(k->idx != idx) continue;
-    if(k->dev_use == SUB_REMOTE_ALARM) {
-      k->dev_reading = senValue;
-      fountIt = TRUE;
+    if(k->dev_use == SUB_REMOTE_SENSOR ||
+       k->dev_use == SUB_REMOTE_THERMOMETER) {
+         k->dev_reading = senValue;
+         k->dev_last_read = Time.now();
+         fountIt = TRUE;
     }
   }
   return fountIt;
@@ -1112,6 +1169,8 @@ bool Alarm::writeTestConfiguration() {
   #define TEST_SENSOR_11
   #define TEST_SENSOR_12
   #define TEST_SENSOR_13
+  #define TEST_SENSOR_14
+  #define TEST_SENSOR_15
 */
   //Sensor 1: mcp_9808
 #ifdef TEST_SENSOR_1
@@ -1243,7 +1302,7 @@ const uint8_t testrom8[8] = { 0x3A,0X07,0X30,0X18,0x00,0x00,0x00,0xBA };
   configuration.use[i] = OW_INDICATOR;
   configuration.sense[i] = SENSE_NORMAL_OPEN;
   configuration.alert_min[i] = 0;
-  configuration.alert_max[i] = 0;
+  configuration.alert_max[i] = 0.90;
   strncpy(configuration.name[i], "TEST DOOR", SENSOR_NAME_SIZE);
   i++;
 #endif
@@ -1300,12 +1359,12 @@ const uint8_t testrom12[8] = { 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
     configuration.dev_addr[i][k] = testrom12[k];
   configuration.dev_flags[i] = 0;
   configuration.port[i] = 0;
-  configuration.use[i] = SUB_REMOTE_ALARM;
+  configuration.use[i] = SUB_REMOTE_SENSOR;
   configuration.sense[i] = 0;
   configuration.sense[i] = SENSE_NORMAL_OPEN;
   configuration.alert_min[i] = 0.0;
-  configuration.alert_max[i] = 999.0;
-  strncpy(configuration.name[i], "REMOTE DOOR", SENSOR_NAME_SIZE);
+  configuration.alert_max[i] = 0.90;
+  strncpy(configuration.name[i], "REMOTE-DOOR", SENSOR_NAME_SIZE);
   i++;
 #endif
 #ifdef TEST_SENSOR_14
@@ -1315,7 +1374,7 @@ const uint8_t testrom12[8] = { 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
       configuration.dev_addr[i][k] = 0xff;
     configuration.dev_flags[i] = 0;
     configuration.port[i] = 0;
-    configuration.use[i] = SUB_REMOTE_ALARM;
+    configuration.use[i] = SUB_REMOTE_THERMOMETER;
     configuration.sense[i] = 0;
     configuration.alert_min[i] = 0.0;
     configuration.alert_max[i] = 999.0;
@@ -1503,6 +1562,7 @@ void remoteAlarm(const char *eventName, const char *data) {
   notify.sendMessage(SHORT_HEADER,1,alarmData);
   //parse this data
   String msgText;
+  char temp[15];
   Parse p(alarmData);
   int parse_cnt;
   #ifdef DEBUGZZ
@@ -1524,7 +1584,8 @@ void remoteAlarm(const char *eventName, const char *data) {
   #endif
   //int i = alarmData.indexOf("@");
   //char msgType = alarmData.charAt(i+1);
-  char msgType = p.getElement(1).charAt(0);
+  uint8_t system_identification = p.getElement(1).toInt();
+  char msgType = p.getElement(2).charAt(0);
   uint8_t setValue = 0;
   //DEBUG shows message received from REMOTE
   if(msgType=='I') msgText = "Info";
@@ -1537,14 +1598,17 @@ void remoteAlarm(const char *eventName, const char *data) {
   else if(msgType == 'C') msgText = "Clear";
   else if(msgType == '?') msgText = "?Unk";
   else msgText = "Unknown";
-  String tmsg = "remote: ";
+  // specify which remote here (for multiple remotes), sys.sysId
+  sprintf(temp,"remote %d:",system_identification);
+  String tmsg = String(temp);
+  tmsg.concat(temp);
   tmsg.concat(msgText);
 
   #ifdef PUSHOVER_SEND_MESSAGES
   notify.sendMessage(SHORT_HEADER,1,tmsg);
   String smsg = "sensors:\\n";
-  if(parse_cnt > 2) {
-    for(int i=3; i< parse_cnt; i++) {
+  if(parse_cnt > 3) {
+    for(int i=4; i< parse_cnt; i++) {
       Parse ps(FIELD_DELIMITER, END_DELIMITER, p.getElement(i));
       //Serial.println(p.getElement(i));
       smsg.concat("\\nel:");
@@ -1565,7 +1629,6 @@ void remoteAlarm(const char *eventName, const char *data) {
   }
   notify.sendMessage(SHORT_HEADER,1,smsg);
   #endif
-  // neet to specify which remote here (for multiple remotes)
 }
 // TO DO: implemented
 // get car temperature from remote sensor, via subscription
@@ -1645,7 +1708,7 @@ bool Notifier::checkTime() {
   if(elapsedminutes < 0) elapsedminutes += 60;
   if(elapsedminutes >= WORRY_MINUTES) {
     elapsedminutes = minute;
-    check = TRUE;
+    //check = TRUE;
   }
   min_hours_between = max(1,hours_between_alert);
   tempHour = hour;
@@ -1656,11 +1719,14 @@ bool Notifier::checkTime() {
   if(tempHour - lasthour >= min_hours_between) { //NEEDS TO BE ON BOUNDARY
     if(lasthour!=-1){
       if(hours_between_alert != 0) {
+         check = TRUE;
          worry_message = updData();
          queueMessage(FULL_HEADER,0,worry_message);
       }
       char tempF[10];
-      sprintf(tempF,"%4.1fF",p_sensor->readTemperature());
+      //CHANGE v3.0 -- read specified thermometer device
+      //sprintf(tempF,"%4.1fF",p_sensor->readTemperature());
+      sprintf(tempF,"%4.1fF",alarm1.readTemperature(OUTSIDE_THERMOMETER_IDX));
       Particle.publish("temperature2", tempF);
       hourlyReset();
       #ifdef SERIAL_DEBUG
@@ -1719,7 +1785,7 @@ String Notifier::updData() {
 // enter command into command_list, keyed by new secret
 // new secred is generated and sent, then used as key for
 // command_list
-const String Notifier::commands = String("HLP.ABT.xxx.SET.DIS.ACK.HOU.LIS.NAM.SEN.ACT.DEA.MIN.MAX.");
+const String Notifier::commands = String("HLP.ABT.TMP.SET.DIS.ACK.HOU.LIS.NAM.SEN.ACT.DEA.MIN.MAX.");
 //                                        0   1   2   3   4   5   6   7   8   9   10  11  12  13
 
 int Notifier::request(String cmd_line) {
@@ -1871,6 +1937,7 @@ int Notifier::do_command(String cmd_line) {
       strcat(device_listing,"\\nSET Alarm On");
       strcat(device_listing,"\\nDISable Alarm");
       strcat(device_listing,"\\nACKnowledge Alert");
+      strcat(device_listing,"\\nTMPerature Sensors");
       strcat(device_listing,"\\nHOU btw Worry to n");
       strcat(device_listing,"\\nLISt All Sensors");
       strcat(device_listing,"\\nNAMe Sensor n");
@@ -1889,8 +1956,11 @@ int Notifier::do_command(String cmd_line) {
       strcat(device_listing, msg);
       queueMessage(SHORT_HEADER,1,device_listing);
       break;
-    case 2 :
-        //avail for new cmd ???
+    case 2 : //TMP Display All Thermometers
+        //xxxxzz
+        alarm1.thermometerListing(device_listing);
+        queueMessage(NO_HEADER, 1, device_listing);
+        return 1;
         break;
     case 3 : // SET Alarm if Secret matches
         //command = 'SET <secret>'
@@ -2151,7 +2221,9 @@ void Notifier::sendMessage(uint8_t hdr, uint8_t pri, char* msg) {
   if(hdr != NO_HEADER) {
     String time = Time.format("%m/%d/%y %H:%M:%S");
     sprintf(event_message,"%s %4.1fF\\n%s",time.c_str(),
-      p_sensor->readTemperature(),
+      //p_sensor->readTemperature(),
+      //CHANGED THERMOMETER to specified device
+      alarm1.readTemperature(OUTSIDE_THERMOMETER_IDX),
       alarm_state_name_def[alarm1.getState()]);
     strcat(event_message," ");
   }
@@ -2397,11 +2469,13 @@ void setup() {
     alarm1.setLastRemote(SUB_OIL_GAUGE, 101.0);   //should set as inactive
     alarm1.setLastRemote(SUB_CAR_MONITOR,  72.0);
     digitalWrite(MESSAGE_PIN, LOW);
+    sys.setSysId(0);
 #endif  //photon master
 #ifdef PHOTON_REMOTE
     Particle.variable("remotedata", remoteData);
     alarm1.setState(alarm_armed); //remote is ALWAYS armed
     notify.sendMessage(FULL_HEADER,1,"REMOTE RUNNING");
+    sys.setSysId(REMOTE_SYSTEM_ID);
 #endif
 #ifdef HARDWARE_WATCHDOG
     hwd.enable();
@@ -2508,7 +2582,8 @@ void loop() {
     Serial.println(alarm_state_name_def[nextState]);
   #endif
   alarm1.setState(nextState);
-  do_master_send = currentState != nextState; //OR checkTime ??
+  //do_master_send = currentState != nextState; //OR checkTime ??
+  if(currentState != nextState) do_master_send = TRUE; //OR from checkTime
   if(do_master_send) {
     //data format:
     //messageid@A@hh:mm:ss@sensor-name@reading$
@@ -2535,7 +2610,7 @@ void loop() {
       break;
       case alarm_clearing: remoteCondition = 'R';
       break;
-      default: remoteCondition = '?';
+      default: remoteCondition = 'I';
     }
     #ifdef SERIAL_DEBUGXX
       Serial.print("remoteCondition=");
@@ -2543,7 +2618,7 @@ void loop() {
     #endif
 
     String time = Time.format("%H:%M:%S");
-    sprintf(data,"%d@%c@%s",msgSeq++,remoteCondition,time.c_str());
+    sprintf(data,"%d@%d@%c@%s",msgSeq++,sys.getSysId(),remoteCondition,time.c_str());
 //---xxxxyy
     strcat(data,sensordata);
     strcat(data,"$");

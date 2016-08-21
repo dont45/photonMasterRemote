@@ -47,6 +47,7 @@ public:
   void dump_device_list();
   bool validate_device_list();
   char* deviceListing(char *buf);
+  char* thermometerListing(char *buf);
   uint8_t wiredeviceAquire();
   bool wiredeviceValidate(uint8_t *ROM);
   bool isTripped();
@@ -73,6 +74,7 @@ public:
   void setDeviceActive(device_t *d, bool);
   void setDeviceAlertMin(device_t *d, int p3);
   void setDeviceAlertMax(device_t *d, int p3);
+  float readTemperature(uint8_t); //read by device idx
 private:
   config_t configuration;
   config_t *p_config;

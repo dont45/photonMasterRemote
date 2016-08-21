@@ -106,3 +106,10 @@ char* State::upTime(char* upTimeStr) {
   sprintf(upTimeStr,"%2d %02d:%02d:%02d",updays,uphours,upminutes,upseconds);
   return upTimeStr;
 }
+
+void State::setSysId(uint8_t id) {
+  sysId = id;
+}
+uint8_t State::getSysId() {
+  return sysId;
+}

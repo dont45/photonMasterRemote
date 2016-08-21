@@ -48,7 +48,7 @@ public:
   char* romFormat(char *buf, uint8_t rom[]);
 private:
   OW *p_ow;
-  float last_temp;  
+  float last_temp;
   float last_oil_level;
 };
 #endif
