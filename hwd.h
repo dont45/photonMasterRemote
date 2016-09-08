@@ -1,8 +1,12 @@
 /*
-  hwd.cpp
+  @file     hwd.h
+  @author   Don Thompson (raynham Engineering)
+  @license  GNU (see license.txt)
+
   hardware watchdog timer
   Implemented for ST Microelectronics STWD100
-  Don Thompson
+  Copyright (C) 2016 Don Thompson, Raynham Engineering
+
   Raynham MA
 
   This program is free software: you can redistribute it and/or modify

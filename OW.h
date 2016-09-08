@@ -1,6 +1,12 @@
 /*
+  @file     ow.h
+  @author   Don Thompson (raynham Engineering)
+  @license  GNU (see license.txt)
+
   OW (1-WIRE) library for Arduino
-  Copyright (C) 2009 raynham engineering
+  Copyright (C) 2009 Don Thompson, Raynham Engineering
+
+  Raynham MA
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -21,7 +27,7 @@
 
 #define SERIAL_DEBUG
 //#define SERIAL_DEBUG_OW
-#define SERIAL_DEBUG_THERM
+//#define SERIAL_DEBUG_THERM
 //#include <inttypes.h>
 #include "DS2482.h"
 // move these to an include ??

@@ -1,7 +1,11 @@
 /*
-  util.h
+  @file     util.h
+  @author   Don Thompson (raynham Engineering)
+  @license  GNU (see license.txt)
+
   utilities for Photon Alarm
-  Don Thompson
+  Copyright (C) 2016 Don Thompson, Raynham Engineering
+
   Raynham MA
 
   This program is free software: you can redistribute it and/or modify
@@ -16,6 +20,9 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  @section  HISTORY
+
 */
 
 #ifndef __UTIL_H__
@@ -24,8 +31,10 @@
 
 #define HALT while(1)
 //TO DO: reorder these so > xx = always present ??
+// dev_use >= SUB_REMOTE_THERMOMETER is REMOTE device
 typedef enum {UNDEFINED=0, USER_KEY=1, MASTER_KEY=2, SWITCH=3, OW_SENSOR=4, OW_INDICATOR=5, OW_RELAY=6, OW_THERMOMETER=7,
               MCP9808_THERMOMETER=8, SUB_REMOTE_THERMOMETER=9, SUB_REMOTE_SENSOR=10, SUB_OIL_GAUGE=11, SUB_CAR_MONITOR=12} SENSOR_TYPE;
+typedef enum {HOME_DEVICE=0, AWAY_DEVICE=1} ;
 typedef enum {DEV_MISSING=0, DEV_PRESENT=1, DEV_UNKNOWN=2};
 typedef enum {SENSOR_DISABLED=0, SENSOR_ACTIVE=1, SENSOR_INACTIVE=2};
 typedef enum {SENSOR_CLEAR, SENSOR_TRIPPED, SENSOR_RESET, SENSOR_STILL_TRIPPED};
@@ -45,6 +54,8 @@ struct state_t
 {
   uint8_t magic;
   uint8_t current_state;
+  uint8_t current_location;
+  int event_sequence;
   uint8_t alert_hours;
   float oil_gallons; // or level ??
 }
@@ -62,6 +73,7 @@ struct config_t
   uint8_t use[MAXDEVICE];
   uint8_t master_idx[MAXDEVICE];
   uint8_t sense[MAXDEVICE];
+  uint8_t alert_level[MAXDEVICE]; //HOME_DEVICE or AWAY_DEVICE
   uint8_t alert_min[MAXDEVICE];  // for thermometers
   uint8_t alert_max[MAXDEVICE];  // for thermometers
   char name[MAXDEVICE][SENSOR_NAME_SIZE+1];
@@ -80,6 +92,7 @@ typedef struct device_t
     uint8_t port;         //PIO-A==0, PIO-B==1
     uint8_t dev_use;
     uint8_t sense;        //sensor NC or NO
+    uint8_t alert_level;  //HOME_DEVICE or AWAY_DEVICE
     uint8_t alert_min;    // 0 ==> no alert_point, <= this ==> do alert
     uint8_t alert_max;    // 0 ==> no alert_point, >= this ==> do alert
     float dev_reading;    //last PIO, temp, etc.

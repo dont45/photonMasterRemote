@@ -1,8 +1,11 @@
 /*
-  tank.h
-  oil tank class
+  @file     tank.h
+  @author   Don Thompson (raynham Engineering)
+  @license  GNU (see license.txt)
+  oil tank class manages the heating oil sensor
   calculates gallons remaining in tank based upon sensor level
-  Don Thompson
+  Copyright (C) 2016 Don Thompson, Raynham Engineering
+
   Raynham MA
 
   This program is free software: you can redistribute it and/or modify

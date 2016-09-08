@@ -173,11 +173,15 @@ bool OW::readThermometer(uint8_t *ROM, double &rTempF) {
     wireWriteByte(0xbe);   //read scratchpad
     #ifdef SERIAL_DEBUG_THERM
     Serial.print("Scratchpad: ");
+    #endif
     for(int i=0; i<9; i++) {
       data[i] = wireReadByte();
+      #ifdef SERIAL_DEBUG_THERM
       Serial.print(data[i],HEX);
       Serial.print(":");
+      #endif
     }
+    #ifdef SERIAL_DEBUG_THERM
     Serial.println();
     #endif
     if(DS2482::crc8(data,8) != data[8]) {

@@ -1,10 +1,14 @@
 /*
-  parse.h
+  @file     parse.h
+  @author   Don Thompson (raynham Engineering)
+  @license  GNU (see license.txt)
+
   remote command parser
   parse data String from remote alarm
   3@T@13:12:16@TEST DOOR:2:0.000000:3@OUTSIDE TEMP:3:89.937500:0$
   0@T@10:24:43@TEST DOOR:2:0.000000:3@OUTSIDE TEMP:3:81.724998:0$
-  Don Thompson
+  Copyright (C) 2016 Don Thompson, Raynham Engineering
+
   Raynham MA
 
   This program is free software: you can redistribute it and/or modify

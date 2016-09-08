@@ -1,7 +1,14 @@
-/* parms.h
- *
- * Configuration parameters
+/*
+  @file     parms.h
+  @author   Don Thompson (raynham Engineering)
+  @license  GNU (see license.txt)
+
+  Configuration parameters
+  Copyright (C) 2016 Don Thompson, Raynham Engineering
+
+  Raynham MA
  */
+
 #ifndef __PARMS_H__
 #define __PARMS_H__
 
@@ -17,51 +24,49 @@
 //which configuration?  (ONLY ONE)
 //Testing Master-Remote WITH Shed as master
 #ifdef PHOTON_MASTER
-#define EE_MAGIC_CONFIG 0X08        // change this to write new test config
-#define EE_MAGIC_STATE 0x9e
+#define EE_MAGIC_CONFIG 0X34        // change this to write new test config
+#define EE_MAGIC_STATE 0x34
 #define PUSHOVER_SEND_MESSAGES      //actually send Pushover Messages
 #define WORRY_MINUTES 5             //time between follow-up notifications
-#define SHED_CONFIGURATION
-#define MCP9808_I2CADDR    0X1A     //0x1A   //A1 HIGH, A0,A2 LOW
+#define HOME_CONFIGURATION
+#define MCP9808_I2CADDR  0X19       //cranky_jester
 #endif
 #ifdef PHOTON_REMOTE
 #define REMOTE_SYSTEM_ID 1
-#define REMOTE_CONFIGURATION
-#define EE_MAGIC_CONFIG 0X27        // change this to write new test config
-#define EE_MAGIC_STATE 0x01
+#define SHED_CONFIGURATION
+#define EE_MAGIC_CONFIG 0X2a        // change this to write new test config
+#define EE_MAGIC_STATE 0x03
 //#define PUSHOVER_SEND_MESSAGES      //DEBUG?? actually send Pushover Messages
 #define WORRY_MINUTES 5             //time between follow-up notifications
-#define MCP9808_I2CADDR                0X19
+#define MCP9808_I2CADDR 0x1A        //scrper_neshed 0x1A  A1 HIGH, A0,A2 LOW
 #endif
 //bench-board test configuration
 #ifdef TEST_CONFIGURATION
 #define MAXDEVICE 1
 #define TEST_SENSOR_1
 #endif
-//config for HOUSE
-#ifdef HOUSE_CONFIGURATION
-#define MAXDEVICE 1
-#define TEST_SENSOR_1
-#endif
 //config for neshed
-#ifdef SHED_CONFIGURATION
-#define MAXDEVICE 4
-#define TEST_SENSOR_1
-#define TEST_SENSOR_2
-#define TEST_SENSOR_13  //REMOTE door
-#define TEST_SENSOR_14  //REMOTE temp
+#ifdef HOME_CONFIGURATION
+#define MAXDEVICE 7
+#define TEST_SENSOR_1   //mcp9808
+#define TEST_SENSOR_9   //MOTION -- DS2413 sw ontest board
+#define TEST_SENSOR_10  //basement water
+#define TEST_SENSOR_13  //Remote SHED door
+#define TEST_SENSOR_14  //Remote Outside Temp
+#define TEST_SENSOR_16  //boiler temp
+#define TEST_SENSOR_20  //smoke detector
 #endif
 //config for breadboard remote unit
-#ifdef REMOTE_CONFIGURATION
+#ifdef SHED_CONFIGURATION
 #define MAXDEVICE 2
-#define TEST_SENSOR_9
-#define TEST_SENSOR_15
+#define TEST_SENSOR_2   //SHED magnetic door
+#define TEST_SENSOR_15  //mcp9808
 #endif
 
-#define OUTSIDE_THERMOMETER_IDX 3
+#define OUTSIDE_THERMOMETER_IDX 4
 #define SENSOR_LIST_SCAN
 #define ALERT_HOURS 3               //no longer used ??
-#define LOOP_DELAY_TIME 1000        //Delay ms between loop passes
+#define LOOP_DELAY_TIME 250         //Delay ms between loop passes
 #define MAX_ALARM_NOTIFIED 1000     //Global limit on published alarms (DEBUG limit                        )
 #define SYSTEM_STATUS_PIN D2        //RED if Armed, Blinking if any tripped
 #define SYSTEM_NOTIFICATION_PIN D3  //GREEN blinks at each loop ??
@@ -89,7 +94,6 @@
 #define PIO_A 0
 #define PIO_B 1
 #define SENSOR_NAME_SIZE 16
-//#define SHORT_NAME_SIZE 2
 #define ONE_DAY_MILLIS (24 * 60 * 60 * 1000)
 //#define WD_EN 5                   // WatchDog enable PIN
 //#define WD_WDI 6                  // WatchDog Timer Reset Input

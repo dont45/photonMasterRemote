@@ -1,8 +1,12 @@
 /*
-  state.cpp
+  @file     state.h
+  @author   Don Thompson (raynham Engineering)
+  @license  GNU (see license.txt)
+
   system states
-  State class manages system status display (LEDs)
-  Don Thompson
+  State class manages system states, principally during startup
+  Copyright (C) 2016 Don Thompson, Raynham Engineering
+
   Raynham MA
 
   This program is free software: you can redistribute it and/or modify

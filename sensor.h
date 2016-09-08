@@ -1,8 +1,11 @@
 /*
-  sensor.h
-  sensors
-  State class manages system status display (LEDs)
-  Don Thompson
+  @file     sensor.h
+  @author   Don Thompson (raynham Engineering)
+  @license  GNU (see license.txt)
+
+  Sensor class manages the sensors defined in the device list
+  Copyright (C) 2016 Don Thompson, Raynham Engineering
+
   Raynham MA
 
   This program is free software: you can redistribute it and/or modify
