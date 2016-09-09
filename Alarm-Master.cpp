@@ -666,8 +666,9 @@ uint8_t Alarm::getState() {
 //descriptive text of alarm state
 String Alarm::getStateDescription(uint8_t st) {
   String stateDescr = alarm_state_name_def[st];
-  if(curState != alarm_disarmed)
-    stateDescr.concat(alarm_state_location_def[curLocation]);
+  if(curState == alarm_armed)
+    stateDescr = alarm_state_location_def[curLocation];
+    //stateDescr.concat(alarm_state_location_def[curLocation]);
   return stateDescr;
 }
 String Alarm::getStateDescription() {
@@ -715,6 +716,7 @@ int Alarm::setState() {
 
 // rewrite of setState(x)
 bool Alarm::setState(uint8_t new_state) {
+  bool retval = FALSE;
   if(curState == new_state) //NO State Change
     return FALSE;
 #ifdef SERIAL_DEBUG_EVENT
@@ -739,18 +741,20 @@ bool Alarm::setState(uint8_t new_state) {
       curState = alarm_disarmed;
       //then clear event_list
       event_list.clear();
-      return TRUE;  //???
+      retval = TRUE;  //???
   }
   else if(new_state == alarm_armed) {
       curState = alarm_armed;
       //write to eeprom ??
-      return TRUE;
+      retval = TRUE;
   }
   else {
-    return FALSE;
+    retval = FALSE;
   }
-  //setState();
-  return TRUE;
+  setStatusLED();
+  stateA = getStateDescription(curState);
+  Particle.publish("alarmState",stateA,60);
+  return retval;
 }
 
 #ifdef OLD_SET_STATE
@@ -2381,11 +2385,15 @@ int Notifier::do_command(String cmd_line) {
         break;
     case 6 : // SET alarm mode to at HOME
         alarm1.setCurLocation(AT_HOME);
-        queueMessage(FULL_HEADER,1,"Location set to AT HOME");
+        stateA = alarm1.getStateDescription();
+        Particle.publish("alarmState",stateA,60);
+        queueMessage(NO_HEADER,1,"SET to HOME");
         break;
     case 7 : // SET alarm mode to AWAY
         alarm1.setCurLocation(AWAY);
-        queueMessage(FULL_HEADER,1,"Location set to AWAY");
+        stateA = alarm1.getStateDescription();
+        Particle.publish("alarmState",stateA,60);
+        queueMessage(NO_HEADER,1,"Set to AWAY");
         break;
     case 8 : // SET alert Hours if Secret matches
           //command = 'HOUR <hours> <secret>'

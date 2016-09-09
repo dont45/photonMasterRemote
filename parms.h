@@ -63,7 +63,7 @@
 #define TEST_SENSOR_15  //mcp9808
 #endif
 
-#define OUTSIDE_THERMOMETER_IDX 4
+#define OUTSIDE_THERMOMETER_IDX 5   //for now use boiler temp
 #define SENSOR_LIST_SCAN
 #define ALERT_HOURS 3               //no longer used ??
 #define LOOP_DELAY_TIME 250         //Delay ms between loop passes
