@@ -1,6 +1,8 @@
 # photonMasterRemote
 A photon Master Alarm system with any number of optional photon Remote nodes
 
+See Wiki for lots more detail
+
 Common source generates a master alarm node or a remote node.  
 The master node is created by the #define PHOTON_MASTER line in parms.h.
 A remote node is created by commenting out the master node #define , i.e. 
