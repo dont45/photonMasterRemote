@@ -33,8 +33,8 @@
 // Alarm states xxx  FIX:???
 // need two states: alarm_state; DISARMED, armed
 // and sensor_state: clear, tripped, notified
-typedef enum {alarm_disarmed=0,alarm_armed=1,alarm_tripped=2,alarm_notifying=3,alarm_clearing=4};
-const char* alarm_state_name_def[5] = {"DISARMED", "Armed", "TRIPPED", "NOTIFY", "CLEAR"};
+typedef enum {alarm_disarmed=0,alarm_armed=1,alarm_tripped=2,alarm_notifying=3,alarm_clearing=4,alarm_reported=5};
+const char* alarm_state_name_def[6] = {"DISARMED", "Armed", "TRIPPED", "NOTIFY", "CLEAR", "REPORTED"};
 typedef enum {AT_HOME=0, AWAY=1};
 const char* alarm_state_location_def[2] = {"HOME", "AWAY"};
 typedef enum {LED_OFF, LED_SOLID, LED_SLOW, LED_FAST};

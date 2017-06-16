@@ -306,7 +306,9 @@ uint8_t OW::readPIOX(uint8_t *ROM, uint8_t port) {
   uint8_t sense_bit;
   pio = readPIO(ROM);
   #ifdef SERIAL_DEBUGXX
-    Serial.print("readPICX dev=");
+    Serial.print("::readPIOX..pio=");
+    Serial.println(pio,BIN);
+    Serial.print(" dev=");
     Serial.print(ROM[0],HEX);
     Serial.print(" port=");
     Serial.print(port);
@@ -328,6 +330,10 @@ uint8_t OW::readPIOX(uint8_t *ROM, uint8_t port) {
         #endif
           break;
     default:
+        #ifdef SERIAL_DEBUGXX
+          Serial.print(" NO FMLY=");
+          Serial.println(ROM[0]);
+          #endif
           return 0;
   }
   return (pio & sense_bit) ? 1 : 0;

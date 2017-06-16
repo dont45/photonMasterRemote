@@ -3,7 +3,7 @@
   @file     Alarm-Master.cpp
   @author   D. Thompson
   @license  GNU General Public License (see license.txt)
-  @version  3.1.0
+  @version  3.2
 
   Copyright (C) 2016 Donald Thompson, Raynham Engineering
 
@@ -21,6 +21,32 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/*
+ * Final Version of 3.1 is 3.1.4.f, 3.1.4
+ * Ran with zero issues and no restarts for 80 plus days whild
+ * away on camping trip.
+ */
+
+/*
+ * Ver 3.2
+ * Add Checi-In feature
+ * Funtions:
+ * Provide notification to a group of pushover users in the event that
+ * the alarm owner fails to respond within the required time-window to
+ * a check-time event generated according to a specific schedule
+ * by the Alarm system user.
+ * This feature is being implemented as a health / safty check of the
+ * alarm user, perhaps eldery, disabled, or just lives alone.  should
+ * an accident or health event occur an the Alarm user is unable to 'click'
+ * the 'all is well' button on the iPhone app, the user list will received
+ * a pushover notification of 'No Timely Checkin by xxx'.
+ */
+
+/* BUG INTRODUCECD:
+ * RANDOM CRASHES INTRODUCED with LOCATION stuff (home / away)
+ *
+ *
+ */
 /* TO DO:
  * Add support for hardware watchdog timer STWD100
  * Add general multi-function alarm node as sub-node (SUB_ALARM_SYSTEM)
@@ -39,6 +65,25 @@
  * worry notifications should show disabled sensors as a reminder.
  */
 
+ /*
+  * Added in v3.2
+  * Checkin -- A system to monitor 'users' health via a required periodic
+  * checkin.
+  *   The genisis of this system was my 8 week camping trip where I was almost
+  * constantly alone, often in very remote places.  Rather than require that
+  * someone check up on me every day, I added this feature to Master-Remote.
+  * While it obviously does not monitor me, it does keep a maximum of a few
+  * hour window to notify all my emergency contacts that someting is wrong,
+  * i.e. I have not responded to a 'checkin' alert.
+  *
+  *   Implemented is a 'Time to Checkin' alert followed by a window for the
+  * 'user' to press the 'chckin' button.  If user does not check in, an alert
+  * is sent to all users on the 'emergency' list.  This feature also includes
+  * a 'panic' button, which when pressed, generates an immediate 'Panic Alert'
+  * to that same list.
+  * Other features include management of checkin hours and suspension of further
+  * checkins for up to 24 hours.
+  */
  /*
   * Added in  v3.1.0
   * HOME an AWAY modes and commands to set
@@ -91,10 +136,10 @@
 //    or can we skip-rom to just read class 01 == i-button ??
 // g) add ds thermometer support
 
-#define SYSTEM_VERSION 3.1.2
+#define SYSTEM_VERSION 3.2.1
 #define SYSTEM_VERSION_MAJOR 3
-#define SYSTEM_VERSION_MINOR 1
-#define SYSTEM_VERSION_SUB 0
+#define SYSTEM_VERSION_MINOR 2
+#define SYSTEM_VERSION_SUB 1
 
 #include "application.h"
 #include <queue>
@@ -112,20 +157,25 @@
 #endif
 
 #ifdef PHOTON_MASTER
-//#define SERIAL_DEBUG
+#define SERIAL_DEBUG
 //#define SERIAL_DEBUG_SEN
 //#define SERIAL_DEBUG_EVENT
  //#define SERIAL_DEBUGXX
 //#define SERIAL_WAIT
 //#define SERIAL_LOOP_WAIT
 //#define HARDWARE_WATCHDOG
+#define HALT_ON_HDW_ERROR
 #endif
+
 #ifdef PHOTON_REMOTE
 #define SERIAL_DEBUG
-#define SERIAL_DEBUGXX
+#define SERIAL_DEBUG_SEN
+//#define SERIAL_DEBUGXX
 #define SERIAL_WAIT
-//#define SERIAL_LOOP_WAIT
+#define SERIAL_LOOP_WAIT
 //#define HARDWARE_WATCHDOG
+#define DEBUG_PARSE_ELEMENT
+//#define DEBUG_PARSE_DETAIL
 #endif
 
 
@@ -143,6 +193,8 @@ double remote_temp;                           // published as temprmt
 String stateA;
 //#endif
 #ifdef PHOTON_REMOTE
+uint8_t remoteState;
+uint8_t nextState;
 char data[80];
 String remoteData;
 int msgSeq = 0;
@@ -460,11 +512,15 @@ bool Sensor::readSensor(device_t &d) {
           d.dev_reading = (float)senval;
           d.dev_last_read = Time.now();
           senret = senval==d.sense;
-          #ifdef SERIAL_DEBUG_SEN
+#ifdef SERIAL_DEBUG_SEN
                   Serial.print("readSensor-OW_SENSOR: name=");
                   Serial.print(d.name);
                   Serial.print(" dev_use=");
                   Serial.print(d.dev_use);
+                  Serial.print(" sense=");
+                  Serial.print(d.sense);
+                  Serial.print(" senval=");
+                  Serial.print(senval);
                   Serial.print(" dev_reading=");
                   Serial.print(d.dev_reading);
                   Serial.print(" tripped=");
@@ -475,7 +531,7 @@ bool Sensor::readSensor(device_t &d) {
                   Serial.print(senval);
                   Serial.print(" return=");
                   Serial.println(senret);
-          #endif
+#endif
           if(d.dev_use==OW_INDICATOR)
             //if(toSetSensor) setSensorIndicator(d, senret);
             setSensorIndicator(d, senret);
@@ -561,6 +617,37 @@ bool Sensor::readSensor(device_t &d) {
   return FALSE;
 }
 
+//clear changedSenbsors
+void Sensor::clearChangedSensors() {
+  changedList.clear();
+}
+
+//add sensor to changedList
+void Sensor::addChangedSensor(device_t sp) {
+    changedList.push_back(sp);
+}
+
+//are there any changed sensors?
+bool Sensor::hasChangedSensor() {
+    return !changedList.empty();
+  }
+
+// return formatted string of changedSensors
+String Sensor::fmtChangedSensors() {
+  //xxxxyy
+  std::list<device_t>::iterator k;
+  char changedbuf[60];
+  changedbuf[0]=0;
+  String changed = String("CHANGED: ");
+  for(k=changedList.begin(); k != changedList.end(); ++k) {
+     strncat(changedbuf, k->name.c_str(), SENSOR_NAME_SIZE);
+     strcat(changedbuf, "*");
+   }
+   strcat(changedbuf, "$");
+   changed.concat(changedbuf);
+   return changed;
+}
+
 //REMOVE THIS...use readSensor()
 float Sensor::readTemperature() {
   // last_temp should be stored by sensor,
@@ -591,7 +678,9 @@ char* Sensor::romFormat(char *buf, uint8_t rom[]) {
 Sensor sensor(&ow);
 
 // notify hours quiet hours, alarm does not
-Notifier notify("shed_notice","shed_alarm", &sensor);
+#include "checkin.h"
+Checkin checkin;
+Notifier notify("shed_notice","shed_alarm","emergency", &sensor);
 
 #include "alarm.h"
 
@@ -668,7 +757,6 @@ String Alarm::getStateDescription(uint8_t st) {
   String stateDescr = alarm_state_name_def[st];
   if(curState == alarm_armed)
     stateDescr = alarm_state_location_def[curLocation];
-    //stateDescr.concat(alarm_state_location_def[curLocation]);
   return stateDescr;
 }
 String Alarm::getStateDescription() {
@@ -1153,7 +1241,9 @@ bool Alarm::validate_device_list() {
     // no ow dev found
     sys.addStatus(fail_owdevice);
     notify.sendMessage(SHORT_HEADER,1,"NO OWDEV");   //send this message now
+#ifdef HALT_ON_HDW_ERROR
     sys.sysState(sys_fail); //this will do HANG
+#endif
   }
   if(all_present)
     Serial.println("all dev present");
@@ -1186,6 +1276,7 @@ void Alarm::setDeviceAlertMax(device_t *d, int max) {
 //set AT_HOME or AWAY
 void Alarm::setCurLocation(uint8_t loc) {
   if(loc < 0 || loc > 1) loc = 0;
+  //just use loc &= 1;  //??
   curLocation = loc;
 }
 uint8_t Alarm::getCurLocation() {
@@ -1400,16 +1491,16 @@ configuration.dev_addr[i][0] = MCP9808_I2CADDR;
   strncpy(configuration.name[i], "INSIDE TEMP", SENSOR_NAME_SIZE);
   i++;
 #endif
-  //Sensor 2: NE Shed Door
+  //Sensor 2: NE Shed Door new sensor pcbWAY
 #ifdef TEST_SENSOR_2
-const uint8_t testrom1[8] = { 0x12,0x3a,0x84,0x72,0x00,0x00,0x00,0xd8 };
-  configuration.master_idx[i] = 0;
+const uint8_t testrom1[8] = {  0x12,0xD0,0x0F,0x6D,0x00,0x00,0x0,0x27 };
+  configuration.master_idx[i] = 3;
   for(int k=0;k<8;k++)
     configuration.dev_addr[i][k] = testrom1[k];
   configuration.dev_flags[i] = 1 << DEVICE_PRIORITY;
   configuration.port[i] = PIO_B;
   configuration.use[i] = OW_SENSOR;
-  configuration.sense[i] = SENSE_NORMAL_CLOSED;
+  configuration.sense[i] = SENSE_NORMAL_OPEN;
   configuration.alert_level[i] = AWAY_DEVICE;
   configuration.alert_min[i] = 0;
   configuration.alert_max[i] = 0;
@@ -1519,12 +1610,12 @@ const uint8_t testrom8[8] = { 0x3A,0X07,0X30,0X18,0x00,0x00,0x00,0xBA };
     configuration.dev_addr[i][k] = testrom8[k];
   configuration.dev_flags[i] = 1 << DEVICE_PRIORITY;
   configuration.port[i] = PIO_B;
-  configuration.use[i] = OW_INDICATOR;
-  configuration.sense[i] = SENSE_NORMAL_CLOSED;
-  configuration.alert_level[i] = HOME_DEVICE;
+  configuration.use[i] = OW_SENSOR;
+  configuration.sense[i] = SENSE_NORMAL_OPEN;
+  configuration.alert_level[i] = AWAY_DEVICE;
   configuration.alert_min[i] = 0;
   configuration.alert_max[i] = 0.90;
-  strncpy(configuration.name[i], "TEST DOOR", SENSOR_NAME_SIZE);
+  strncpy(configuration.name[i], "FRONT DOOR", SENSOR_NAME_SIZE);
   i++;
 #endif
 #ifdef TEST_SENSOR_10
@@ -1578,7 +1669,7 @@ const uint8_t testrom11[8] = { 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
 #ifdef TEST_SENSOR_13
 //subscription sensor -- REMOTE ALARM pseudo
 const uint8_t testrom12[8] = { 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
-  configuration.master_idx[i] = 1;
+  configuration.master_idx[i] = 0;  //Only defined on remote device
   for(int k=0;k<8;k++)
     configuration.dev_addr[i][k] = testrom12[k];
   configuration.dev_flags[i] = 0;
@@ -1691,15 +1782,86 @@ const uint8_t testrom19[8] = { 0x12,0x73,0x25,0x0a,0x00,0x00,0x00,0x71 };
   for(int k=0;k<8;k++)
     configuration.dev_addr[i][k] = testrom19[k];
   configuration.dev_flags[i] = 1 << DEVICE_PRIORITY;
-  configuration.port[i] = PIO_A;
+  configuration.port[i] = PIO_B;
   configuration.use[i] = OW_SENSOR;
   configuration.sense[i] = SENSE_NORMAL_OPEN;
   configuration.alert_level[i] = AWAY_DEVICE;
   configuration.alert_min[i] = 0;
   configuration.alert_max[i] = 0;
-  strncpy(configuration.name[i], "KITCHEN SMOKE", SENSOR_NAME_SIZE);
+  strncpy(configuration.name[i], "GARAGE DOOR", SENSOR_NAME_SIZE);
   i++;
 #endif
+//Sensor 2: Test Parasitic Board
+#ifdef TEST_SENSOR_21
+const uint8_t testrom20[8] = { 0x12,0x50,0xF2,0x72,0x00,0x00,0x0,0x25 };
+configuration.master_idx[i] = 0;
+for(int k=0;k<8;k++)
+  configuration.dev_addr[i][k] = testrom20[k];
+configuration.dev_flags[i] = 1 << DEVICE_PRIORITY;
+configuration.port[i] = PIO_B;
+configuration.use[i] = OW_SENSOR;
+configuration.sense[i] = SENSE_NORMAL_OPEN;
+configuration.alert_level[i] = HOME_DEVICE;
+configuration.alert_min[i] = 0;
+configuration.alert_max[i] = 0;
+strncpy(configuration.name[i], "DINING RM IR", SENSOR_NAME_SIZE);
+i++;
+#endif
+
+//new sensor PCB board, pcbWAY SENSOR
+//sensor add:12:D0:F:6D:0:0:0:27: valid:0
+#ifdef TEST_SENSOR_22
+const uint8_t testrom21[8] = { 0x12,0xD0,0x0F,0x6D,0x00,0x00,0x0,0x27 };
+configuration.master_idx[i] = 0;
+for(int k=0;k<8;k++)
+  configuration.dev_addr[i][k] = testrom21[k];
+configuration.dev_flags[i] = 1 << DEVICE_PRIORITY;
+configuration.port[i] = PIO_B;
+configuration.use[i] = OW_INDICATOR;
+configuration.sense[i] = SENSE_NORMAL_OPEN;
+configuration.alert_level[i] = AWAY_DEVICE;
+configuration.alert_min[i] = 0;
+configuration.alert_max[i] = 0;
+strncpy(configuration.name[i], "NEW PCB SENSOR", SENSOR_NAME_SIZE);
+i++;
+#endif
+
+// ds2413 BREAKOUT
+//sensor add:3A:16:27:18:0:0:0:FB: valid:0
+#ifdef TEST_SENSOR_23
+const uint8_t testrom22[8] = { 0x3a,0x16,0x27,0x18,0x00,0x00,0x0,0xfb };
+configuration.master_idx[i] = 0;
+for(int k=0;k<8;k++)
+  configuration.dev_addr[i][k] = testrom22[k];
+configuration.dev_flags[i] = 1 << DEVICE_PRIORITY;
+configuration.port[i] = PIO_B;
+configuration.use[i] = OW_SENSOR;
+configuration.sense[i] = SENSE_NORMAL_OPEN;
+configuration.alert_level[i] = HOME_DEVICE;
+configuration.alert_min[i] = 0;
+configuration.alert_max[i] = 0;
+strncpy(configuration.name[i], "INSIDE DOORS", SENSOR_NAME_SIZE);
+i++;
+#endif
+
+//new sensor ds2406p, smoke detector
+//sensor add:12:8E:15:6D:0:0:0:DB: valid:0
+#ifdef TEST_SENSOR_24
+const uint8_t testrom23[8] = { 0x12,0x8E,0x15,0x6D,0x00,0x00,0x0,0xDB };
+configuration.master_idx[i] = 0;
+for(int k=0;k<8;k++)
+  configuration.dev_addr[i][k] = testrom23[k];
+configuration.dev_flags[i] = 1 << DEVICE_PRIORITY;
+configuration.port[i] = PIO_A;
+configuration.use[i] = OW_SENSOR;
+configuration.sense[i] = SENSE_NORMAL_OPEN;
+configuration.alert_level[i] = AWAY_DEVICE;
+configuration.alert_min[i] = 0;
+configuration.alert_max[i] = 0;
+strncpy(configuration.name[i], "FR SMOKE DETECTOR", SENSOR_NAME_SIZE);
+i++;
+#endif
+
   // and Write it
   EEPROM_writeAnything(CONFIGURATION_ADDRESS, configuration);
 #ifdef SERIAL_DEBUG
@@ -1708,7 +1870,6 @@ const uint8_t testrom19[8] = { 0x12,0x73,0x25,0x0a,0x00,0x00,0x00,0x71 };
 #endif
   return TRUE;
 }
-
 bool Alarm::readConfiguration() {
   // READ configuration for updates
   // How to read eeprom on photon ??
@@ -1755,9 +1916,15 @@ bool Alarm::readSavedState() {
 #endif
   return FALSE;
 }
+// TODO: we need to minimize eeprom writes to redue ware !!!
+// In testing mode, just don't writes
+// Don't write event
+// Just write alarm State (set or disarmed, not sub-states)
 bool Alarm::writeSavedState() {
+  //limit these at time of call, not here ??
+  //if(alarm_saved_state.current_state == isArmed()) return FALSE;
   alarm_saved_state.magic = EE_MAGIC_STATE;
-  alarm_saved_state.current_state = curState;
+  alarm_saved_state.current_state = isArmed();
   alarm_saved_state.current_location = curLocation;
   alarm_saved_state.alert_hours = notify.getAlertHours();
   alarm_saved_state.oil_gallons = gallonsO;
@@ -1788,7 +1955,8 @@ bool Alarm::checkSensors(void) {
   bool sensorIsReporting = FALSE;
   bool reporting = FALSE;      //reporting a new tripped sensor
   firstTrippedSensor = 0;
-  trippedList.clear();
+  trippedList.clear();        //list of those sensor tripped
+  sensor.clearChangedSensors();        //list of sensors which have changed state
   std::list<device_t>::iterator k;
   for(k=device_list.begin(); k !=device_list.end(); ++k) {
     device_t sp = *k;
@@ -1809,6 +1977,7 @@ bool Alarm::checkSensors(void) {
   #endif
     //if(sp.status == DEV_PRESENT) {  <=== add this ???
     if(sensor.readSensor(*k)) {
+      //at_home sensor is disabled if currently at_home
       if(curLocation==AT_HOME && k->alert_level==AT_HOME) return FALSE;
       if(k->tripped) {
         /* New design:
@@ -1862,6 +2031,13 @@ bool Alarm::checkSensors(void) {
           Serial.println(reporting);
       }
     #endif
+    if((uint8_t)k->dev_reading != k->tripped) { //???fix types ??
+#ifdef SERIAL_DEBUG_SEN
+      Serial.print("sensor changed:");
+      Serial.println(k->name);
+#endif
+      sensor.addChangedSensor(*k);
+    }
   }
   return reporting;
 }
@@ -1947,7 +2123,7 @@ void remoteAlarm(const char *eventName, const char *data) {
   // specify which remote here (for multiple remotes), sys.sysId
   sprintf(temp,"remote %d:",system_identification);
   String tmsg = String(temp);
-  tmsg.concat(temp);
+  //tmsg.concat(temp);  //duplicated, remove line
   tmsg.concat(msgText);
 
   #ifdef PUSHOVER_SEND_MESSAGES
@@ -1957,23 +2133,28 @@ void remoteAlarm(const char *eventName, const char *data) {
     for(int i=4; i< parse_cnt; i++) {
       Parse ps(FIELD_DELIMITER, END_DELIMITER, p.getElement(i));
       //Serial.println(p.getElement(i));
+#ifdef DEBUG_PARSE_ELEMENT
       smsg.concat("\\nel:");
       smsg.concat(p.getElement(i));
+#endif
       //notify.sendMessage(SHORT_HEADER,1,smsg);
       ps.doParse();
       //String sdetail = "detail: ";
       uint8_t masterIdx = ps.getElement(1).toInt();
       float setValue = ps.getElement(2).toFloat();
+#ifdef DEBUG_PARSE_DETAIL
       smsg.concat("\\ndt:");
       smsg.concat (ps.getElement(0));
       smsg.concat(":midx=");
       smsg.concat(ps.getElement(1));
       smsg.concat(":val=");
       smsg.concat(ps.getElement(2));
+#endif
       alarm1.setAlarmRemote(masterIdx, setValue);  //??xxxxyy
     }
   }
-  notify.sendMessage(SHORT_HEADER,1,smsg);
+  notify.sendMessage(SHORT_HEADER,1,
+    smsg);
   #endif
 }
 // TO DO: implemented
@@ -2002,7 +2183,7 @@ void oilHandler(const char *eventName, const char *data) {
   gallonsO = tank.tankGallons(level_in);    //debug exposed cloud variable
 
   alarm1.setLastRemote(SUB_OIL_GAUGE, gallonsO);
-  alarm1.writeSavedState();
+  //alarm1.writeSavedState();  //removed: eeprom ware
   sprintf(msg,"Received Oil Level: %dmm (%din) =%5.1f gallons", level_mm, level_in, gallonsO);
   notify.queueMessage(SHORT_HEADER,0,msg);
   Serial.printf("oilHandler: reveived new level: %f", gallonsO);
@@ -2059,6 +2240,37 @@ bool Notifier::checkTime() {
   min_hours_between = max(1,hours_between_alert);
   tempHour = hour;
   if(tempHour < lasthour) tempHour += 24;
+  if(!checkin.inPanicMode() && checkin.panicExpired()) {
+    queueMessage(NO_HEADER, 2, "DON FAILED TO CHECKIN");
+    //first send msg to don
+    //and set emergency notification time to now + margin
+    checkin.setCheckinTime(Time.now() + 3600); //no more for now
+    checkin.setPanicTime(0); //no more for now
+    checkin.setPanicMode(); //count times panic sent, limited to 2??
+  }
+  //check for checkin timeout every hour
+  if(tempHour - lasthour >= 1) {
+    //TODO: 1) add grace to expired time ?? or already included?
+    //      2) first send me an alert
+    //      2) reset timer to what??
+    // first alert should be to don, followed by emergency list
+    // first check if we should check in THIS hour:
+    if(checkin.checkinThisHour(tempHour)) {
+      if(checkin.timeExpired()) {
+        queueMessage(NO_HEADER, 1, "CHECKIN NOW");
+#ifdef SERIAL_DEBUGXX
+        String tmp = checkin.showCheckinTime();
+        queueMessage(NO_HEADER, 1, tmp);
+        tmp = checkin.showPanicTime();
+        queueMessage(NO_HEADER, 1, tmp);
+#endif
+        //first send msg to don
+        //and set emergency notification time to now + margin
+        checkin.setCheckinTime(Time.now() + TIME_BETWEEN_CHECKIN); //no more for now
+        checkin.setPanicTime(Time.now() + TIME_BETWEEN_CHECKIN);   //5 min to do checkin
+      }
+    }
+  }
   //if hours_between_alert = 4  {4,8,12}
   //FIRST TIME EARLY: LAST_HOUR 3
   //if hours_between_alert is zero, don't alert but do log temp hourly
@@ -2109,8 +2321,24 @@ String Notifier::updData() {
     sprintf(buf,"\\ncar temp: %5.1fF",remote_temp);
     msg.concat(buf);
   }
-  sprintf(buf,"\\nworry %d hours",hours_between_alert);
+  sprintf(buf,"\\nworry hours %d",hours_between_alert);
   msg.concat(buf);
+
+  sprintf(buf,"\\ncheckin hours ");
+  msg.concat(buf);
+  String hrs = checkin.showCheckinHours();
+  msg.concat(hrs.c_str());
+#ifdef SERIAL_DEBUGXX
+  sprintf(buf,"\\nnext  ");
+  msg.concat(buf);
+  String ct = Time.format(checkin.getCheckinTime(), "%I:%M%p");
+  msg.concat(ct.c_str());
+  sprintf(buf,"\\npanic ");
+  msg.concat(buf);
+  String pt = Time.format(checkin.getPanicTime(), "%I:%M%p");
+  msg.concat(pt.c_str());
+#endif
+
   ts = alarm1.firstTripped();
   if(ts != NULL) {
     //SHOULD do all tripped, not just first
@@ -2131,12 +2359,22 @@ String Notifier::updData() {
 // enter command into command_list, keyed by new secret
 // new secred is generated and sent, then used as key for
 // command_list
-const String Notifier::commands = String("HLP.ABT.TMP.SET.DIS.ACK.HOM.AWA.HOU.LIS.NAM.SEN.ACT.DEA.MIN.MAX.EVT.CFG.");
-//                                        0   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15  16  17
+// This typdef order must follow order of commands which follow
+typedef enum {CMD_HLP, CMD_ABT, CMD_TMP, CMD_CIN, CMD_CAN,
+              CMD_PAN, CMD_CIR, CMD_CIS, CMD_CIH, CMD_SET,
+              CMD_DIS, CMD_ACK, CMD_HOM, CMD_AWA, CMD_HOU,
+              CMD_LIS, CMD_NAM, CMD_SEN, CMD_ACT, CMD_DEA,
+              CMD_MIN,CMD_MAX,CMD_EVT,CMD_CFG};
+const String Notifier::commands =
+      String("HLP.ABT.TMP.CIN.CAN.PAN.CIR.CIS.CIH.SET.DIS.ACK.HOM.AWA.HOU.LIS.NAM.SEN.ACT.DEA.MIN.MAX.EVT.CFG.");
+//            0   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15  16  17  18  19  20  21  22  23
+#define COMMAND_NO_CONFIRM 4
+#define COMMAND_ZERO_CONFIRM 5
 
 int Notifier::request(String cmd_line) {
   char msg[20];
   int cidx;
+  int new_secret;
   String delim = String(".");
   //sscanf (cmd_line,"%s %s %s %s",msg,args1,args2,args3);
   sscanf (cmd_line,"%s",msg);
@@ -2153,15 +2391,19 @@ int Notifier::request(String cmd_line) {
   }
   else cidx /=4;
   //execute command immediately without confirmation
-  if(cidx <= 2) {
-    return do_command(cmd_line);
+  if(cidx <= COMMAND_NO_CONFIRM) {
+      return do_command(cmd_line);
   }
-// if ok, generate new secrets
-  int new_secret = random(RANDOM_MIN,RANDOM_MAX);
+  else if(cidx <= COMMAND_ZERO_CONFIRM) {
+    new_secret = 0;
+  }
+  else new_secret = random(RANDOM_MIN,RANDOM_MAX);
 // enter into command_list
   command_list[new_secret] = cmd_line;
 // message secret to confirm
   sprintf(msg, " Confirmation: %d", new_secret);
+  //int tpri = 2;
+  //sprintf(msg, "Confirmation:\"%d,\"priority\":%d", new_secret, tpri);  //\n
   queueMessage(NO_HEADER,1,msg);
   return 1;
 }
@@ -2274,9 +2516,7 @@ int Notifier::do_command(String cmd_line) {
   Serial.printf("arg=%d\n",p2);
 #endif
   switch(cidx) {
-    case 0 : // Command HELP
-    //("HLP.ABT.TMP.SET.DIS.ACK.HOM.AWA.HOU.LIS.NAM.SEN.ACT.DEA.MIN.MAX.EVT.CFG.");
-
+    case CMD_HLP : // Command HELP
       strcpy(listing_buffer,"\\nCommands:");
       strcat(listing_buffer,"\\nABT - About");
       strcat(listing_buffer,"\\nHLP - This Help");
@@ -2300,7 +2540,7 @@ int Notifier::do_command(String cmd_line) {
       strcat(listing_buffer,"\\nCFG - gen device config");
       queueMessage(NO_HEADER,1,listing_buffer);
       break;
-    case 1 : // ABT
+    case CMD_ABT : // ABT
       strcpy(listing_buffer,"\\nphotonAlarm\\n");
       strcat(listing_buffer,"\\ncopyright (c) re:Engineering 2016");
       strcat(listing_buffer,"\\nDonald Thompson");
@@ -2308,34 +2548,65 @@ int Notifier::do_command(String cmd_line) {
       strcat(listing_buffer, msg);
       queueMessage(NO_HEADER,1,listing_buffer);
       break;
-    case 2 : //TMP Display All Thermometers
+    case CMD_TMP : //TMP Display All Thermometers
         alarm1.thermometerListing(listing_buffer);
         queueMessage(NO_HEADER, 1, listing_buffer);
         return 1;
         break;
-    case 3 : // SET Alarm if Secret matches
+    case CMD_CIN :  //check-in
+        // PERFOMR user checkin, i.e. cancal pending 'panic'
+        checkin.userCheckin();
+        // should have return status and show if completed or too late ??
+        queueMessage(NO_HEADER,1,"CHECKIN COMPLETED");
+        return 1;
+        break;
+        break;
+    case CMD_CAN :  //cancel 'panic' and all other pending commands
+        command_list.erase(0);
+        queueMessage(NO_HEADER,1,"COMMAND CANCELLED");
+        return 1;
+        break;
+    case CMD_PAN :  //PANIC: send immediate message to emergancy contact list (pri=2)
+        queueMessage(SHORT_HEADER,2,"PANIC BUTTON -- CONTACT IMMEDIATELY");
+        return 1;
+        break;
+    case CMD_CIR :  //checkin reset, go out of panic mode
+        checkin.reset();
+        queueMessage(SHORT_HEADER,1,"CHECKIN REENABLED");
+        return 1;
+        break;
+  case CMD_CIS :  //SUSPEND CHECKINS for XX HOURS
+        checkin.setSuspended(p1); //suspend for 12 hours
+        queueMessage(SHORT_HEADER,0,"CHECKIN SUSPENDED");
+        return 1;
+        break;
+    case CMD_CIH :  //set or clear checkin hours
+        if(p1 > 23 || p1 < -23 || p1==0) return 0;
+        checkin.setCheckinHour(p1);
+        queueMessage(NO_HEADER,1,"CHECKIN HOUR SET");
+        return 1;
+    case CMD_SET : // SET Alarm state to enabled
         //command = 'SET <secret>'
           // set unless tripped
         if(alarm1.setState(alarm_armed)) {
-            alarm_saved_state.current_state = alarm1.getState();
             alarm1.writeSavedState();
             #ifdef SERIAL_DEBUG
               Serial.print('set armed');
             #endif
+            queueMessage(SHORT_HEADER, alarm1.getPriority(),alarm1.getPendingMessage());
         }
-        queueMessage(SHORT_HEADER, alarm1.getPriority(),alarm1.getPendingMessage());
         return 1;
         break;
-    case 4 : // Disarm Alarm if Secret matches
+    case CMD_DIS : // Disarm Alarm if Secret matches
         //command = 'DISARM <secret>'
         // DISABLE alarm here!!
-        alarm1.setState(alarm_disarmed);
-        alarm_saved_state.current_state = alarm_disarmed;
-        alarm1.writeSavedState();
-        queueMessage(SHORT_HEADER,alarm1.getPriority(),alarm1.getPendingMessage());
+        if(alarm1.setState(alarm_disarmed)) {
+          alarm1.writeSavedState();
+          queueMessage(SHORT_HEADER,alarm1.getPriority(),alarm1.getPendingMessage());
+        }
         return 1;
         break;
-    case 5 : // Acknowledge tripped Alarm
+    case CMD_ACK : // Acknowledge tripped Alarm
         //TODO: REDO THIS
         //xx find sequence specified in ACK message and Acknowledge
         //xx remove from event_list
@@ -2383,19 +2654,19 @@ int Notifier::do_command(String cmd_line) {
         */
         return 1;
         break;
-    case 6 : // SET alarm mode to at HOME
+    case CMD_HOM : // SET alarm mode to at HOME
         alarm1.setCurLocation(AT_HOME);
         stateA = alarm1.getStateDescription();
         Particle.publish("alarmState",stateA,60);
         queueMessage(NO_HEADER,1,"SET to HOME");
         break;
-    case 7 : // SET alarm mode to AWAY
+    case CMD_AWA : // SET alarm mode to AWAY
         alarm1.setCurLocation(AWAY);
         stateA = alarm1.getStateDescription();
         Particle.publish("alarmState",stateA,60);
         queueMessage(NO_HEADER,1,"Set to AWAY");
         break;
-    case 8 : // SET alert Hours if Secret matches
+    case CMD_HOU : // SET alert Hours if Secret matches
           //command = 'HOUR <hours> <secret>'
           //sscanf (cmd_line,"%s %d %d",msg,&i, &h);
           // set hours_between_alert if valid
@@ -2413,7 +2684,7 @@ int Notifier::do_command(String cmd_line) {
             queueMessage(NO_HEADER,1,"INVALID ALERT HOURS");
           return 1;
           break;
-    case 9 : // List all Devices
+    case CMD_LIS : // List all Devices
           //command = 'LIST <secret>'
           // LIST ALL Sensor Devices
           alarm1.deviceListing(listing_buffer);
@@ -2421,7 +2692,7 @@ int Notifier::do_command(String cmd_line) {
           return 1;
           break;
 
-    case 10 : // Name a Sensor
+    case CMD_NAM : // Name a Sensor
           //command = 'NAM <secret> <sen#> <name>'
           msg[0]=0;
           // NAME a Sensor Devices
@@ -2437,7 +2708,7 @@ int Notifier::do_command(String cmd_line) {
           queueMessage(SHORT_HEADER, 1,msg);
           return 1;
           break;
-    case 11 : // List a Devices in Full
+    case CMD_SEN : // List a Devices in Full
           //command = 'SEN <sen#>'
           listing_buffer[0]=0;
           d = alarm1.getDevice(p1);
@@ -2455,6 +2726,8 @@ int Notifier::do_command(String cmd_line) {
               strcat(listing_buffer,sensor_use_def[d->dev_use]);
               strcat(listing_buffer,"\\nSense: ");
               strcat(listing_buffer,sensor_sense_def[d->sense]);
+              strcat(listing_buffer,"\\nAlert: ");
+              strcat(listing_buffer,sensor_level_def[d->alert_level]);
               if(d->alert_min) {
                 sprintf(buf,"\\nAlert Min: %d", d->alert_min);
                 strcat(listing_buffer, buf);
@@ -2489,7 +2762,7 @@ int Notifier::do_command(String cmd_line) {
           queueMessage(NO_HEADER,1,dev_msg);
           return 1;
           break;
-      case 12 : // Activate a sensor
+      case CMD_ACT : // Activate a sensor
           //command = 'ACT <sen#>'
           //TO DO: only set if present ??
           d = alarm1.getDevice(p1);
@@ -2502,7 +2775,7 @@ int Notifier::do_command(String cmd_line) {
           queueMessage(SHORT_HEADER,1,msg);
           return 1;
           break;
-      case 13 : // Deactivate a sensor
+      case CMD_DEA : // Deactivate a sensor
           //command = 'DEA <secret> <sen#>'
           d = alarm1.getDevice(p1);
           if(d) {
@@ -2514,7 +2787,7 @@ int Notifier::do_command(String cmd_line) {
           queueMessage(SHORT_HEADER,1,msg);
           return 1;
           break;
-      case 14 : // Set Sensor Minimum Alarm Temperature
+      case CMD_MIN : // Set Sensor Minimum Alarm Temperature
           //command = 'MIN <sen#> <min>'
           d = alarm1.getDevice(p1);
           if(d) {
@@ -2527,7 +2800,7 @@ int Notifier::do_command(String cmd_line) {
           return 1;  //ret values ??
           break;
 
-      case 15 : // Set Sensor MAXimum Alarm Temperature
+      case CMD_MAX : // Set Sensor MAXimum Alarm Temperature
           //command = 'MAX <sen#> <min>'
           d = alarm1.getDevice(p1);
           if(d) {
@@ -2540,14 +2813,14 @@ int Notifier::do_command(String cmd_line) {
           return 1;  //ret values ??
           break;
 
-          case 16 : // Display Event List
+      case CMD_EVT : // Display Event List
           //command = 'EVT'
           alarm1.eventListing(listing_buffer);
           queueMessage(NO_HEADER, 1, listing_buffer);
           return 1;
 
           break;
-          case 17 : // Auto-Configure Sensors
+      case CMD_CFG : // Auto-Configure Sensors
               //command = 'CFG'
               // To be Implemented...
               //1) scan 1-wire sensors and I2C devices
@@ -2611,7 +2884,8 @@ int Alarm::addEvent(uint8_t idx) {
   Serial.print("addEvent: event_sequence=");
   Serial.print(event_sequence);
   #endif
-  alarm1.writeSavedState();
+  //don't keep evt due to eeprom ware
+  //alarm1.writeSavedState();
   event_list[event_sequence] = idx;
   #ifdef SERIAL_DEBUG_EVENT
   Serial.print("added dev idx=");
@@ -2660,7 +2934,6 @@ void Notifier::setAlertHours(int hours) {
   lasthour = Time.hour() - 1;
   if(lasthour < 0) lasthour = 23;
   hours_between_alert = hours;
-  //write ??
   alarm1.writeSavedState();
 }
 uint8_t Notifier::getAlertHours() {
@@ -2670,8 +2943,8 @@ uint8_t Notifier::getAlertHours() {
 bool Notifier::msgqueueEmpty() {
     return message_queue.empty();
 }
-void Notifier::queueMessage(uint8_t header, uint8_t pri, String msg) {
-  Message message;
+void Notifier::queueMessage(uint8_t header, int pri, String msg) {
+  pMessage message;
   message.header_style = header;
   message.priority = pri;
   message.message_text = msg;
@@ -2688,7 +2961,7 @@ void Notifier::hourlyReset() {
   }
 }
 void Notifier::dequeMessage() {
-  Message next_message;
+  pMessage next_message;
   if(!message_queue.empty()){
     next_message = message_queue.front();
     //don't flood messages, but if they are not sent\
@@ -2710,7 +2983,7 @@ void Notifier::dequeMessage() {
 #endif
 }
 
-void Notifier::sendMessage(uint8_t hdr, uint8_t pri, String msg) {
+void Notifier::sendMessage(uint8_t hdr, int pri, String msg) {
   //TO DO: shorten tmessage to 200 ?? messages can not be this long
   char tmessage[620];  //debug testing size limit / was 600
   strncpy(tmessage, msg.c_str(), 618);
@@ -2718,7 +2991,7 @@ void Notifier::sendMessage(uint8_t hdr, uint8_t pri, String msg) {
   sendMessage(hdr, pri, tmessage);
 }
 
-void Notifier::sendMessage(uint8_t hdr, uint8_t pri, char* msg) {
+void Notifier::sendMessage(uint8_t hdr, int pri, char* msg) {
 #ifdef SERIAL_DEBUG
   Serial.print("sendMessage: pri=");
   Serial.print(pri);
@@ -2758,16 +3031,39 @@ void Notifier::sendMessage(uint8_t hdr, uint8_t pri, char* msg) {
   }
 
   strcat(event_message, msg);
+//testing priority as webhook parameters
+//currently ONLY IMPLEMENTED in webhook elmst-alarm as MESSAGE_PRIORITY
+//DOES NOT WORK
+/*
+String mdata = String::format(
+  "{\"message\":\"%s\", \"priority\":%d}",
+  event_message, pri);
+*/
 #ifdef PUSHOVER_SEND_MESSAGES
-  //TO DO:  SELECT webhook_id based upon priority of message
-  if(pri) {
-    Serial.print(" publish w/ priority ");
-    Spark.publish(priority_webhook_id, event_message, 60, PRIVATE);
-//  Spark.publish(webhook_id, event_message, 60, PUBLIC);
-  }
-  else {
-    Serial.print(" publish ");
-    Spark.publish(webhook_id, event_message, 60, PRIVATE);
+  //  SELECT webhook_id based upon priority of message
+  // TODO - make  webhook_id an array rather than this switch
+  switch(pri) {
+    case -1:  //with no sound or viberate
+         Serial.print(" pri=-1?");
+         //TODO:
+         break;
+    case 0:
+          Serial.print(" publish ");
+          Spark.publish(webhook_id, event_message, 60, PRIVATE);
+          //Spark.publish("Elmst", mdata, 60, PRIVATE);
+          break;
+    case 1:
+          Serial.print(" publish w/ priority ");
+          Spark.publish(priority_webhook_id, event_message, 60, PRIVATE);
+          //testing WEBHOOK parameter
+          //Spark.publish(webhook_id, event_message, 60, PRIVATE);
+          //Spark.publish("Elmst", mdata, 60, PRIVATE);
+          break;
+    case 2:
+          Serial.print(" publish emergency ");
+          Spark.publish(emergency_webhook_id, event_message, 60, PRIVATE);
+          break;
+  //  default:
   }
 #endif
 #ifdef SERIAL_DEBUG
@@ -2854,6 +3150,9 @@ void setup() {
     //delay(1000);
     Serial.printf("\\nPhotoAlarm initializing...Version %d.%d.%d",
           SYSTEM_VERSION_MAJOR, SYSTEM_VERSION_MINOR, SYSTEM_VERSION_SUB);
+    //checking to ensure Pushover is working
+    //notify.sendMessage(NO_HEADER,1,"SYSTEM Initializing1");
+    //notify.sendMessage(NO_HEADER,2,"SYSTEM Initializing2");
     sys.sysState(sys_starting);
 //    digitalWrite(trigger3, HIGH); //DEBUG, trigger pin3 for logic 8 analyzer
     Time.zone(EDT_OFFSET);
@@ -2862,7 +3161,9 @@ void setup() {
     if(stat) {
       sys.addStatus(fail_hardware);
       notify.sendMessage(NO_HEADER,1,"MCP9808 FAIL");
+#ifdef HALT_ON_HDW_ERROR
       sys.sysState(sys_fail); //this will do HANG
+#endif
     }
     ow.reset();
     if(!alarm1.readSavedState()) {
@@ -2891,6 +3192,9 @@ void setup() {
       }
       sys.addStatus(fail_eeprom);
       notify.sendMessage(NO_HEADER,1,"CFG FAIL");   //send this message now
+      #ifdef SERIAL_DEBUG
+          Serial.println("CFG FAIL--HALT");
+      #endif
       sys.sysState(sys_fail); //this will do HANG
     }
     //build device list from read configuration
@@ -2909,7 +3213,12 @@ void setup() {
     if(stat != 0x18) {
       notify.sendMessage(NO_HEADER,1,"HDW FAIL");   //send this message now
       sys.addStatus(fail_ds2482);
+#ifdef HALT_ON_HDW_ERROR
+      #ifdef SERIAL_DEBUG
+        Serial.println("HDW FAIL-missing DS2482");
+      #endif
       sys.sysState(sys_fail);           //and halt
+#endif
     }
     stat = ow.wireReadConfig();
     #ifdef SERIAL_WAIT
@@ -3041,124 +3350,55 @@ void loop() {
 #endif  //PHOTON_MASTER
 #ifdef PHOTON_REMOTE
 void loop() {
-  //TODO: fix message dequeue so that queueMessage works, don't use sendMessage
   #ifdef SERIAL_DEBUG
     Serial.println("loop.");
   #endif
   bool do_master_send = notify.checkTime();
   //DEBUG: REMOVE
   do_master_send = FALSE;  //shut off worry sends
-  //ALL THIS !!! REWRITE TODO!!!
   bool t = alarm1.checkSensors();
+  String changed = sensor.fmtChangedSensors();
   #ifdef SERIAL_DEBUGXX
   Serial.print("checkSensors returned:");
   Serial.println(t);
+  Serial.print("changedSensors:");
+  Serial.println(changed);
   #endif
-  uint8_t currentState = alarm1.getState();
-  uint8_t nextState = currentState;
   #ifdef SERIAL_DEBUGXX
-    Serial.print("currentState=");
-    Serial.print(alarm_state_name_def[currentState]);
+    Serial.print("remoteState=");
+    Serial.print(alarm_state_name_def[remoteState]);
   #endif
-  //change this to use setState() like MASTER loop ????
-  if(t){
-    switch(alarm1.getState()) {
-      case alarm_armed:     nextState = alarm_tripped;
-      break;
-      //DOES NOT go to notifyint until sensor reset
-      //case alarm_tripped:   nextState = alarm_notifying;
-      //break;
-      //case alarm_notifying: nextState = alarm_notifying;
-      //break;
-    }
-  }
-  else {
-    switch(alarm1.getState()) {
-      //case alarm_armed:
-      //break;
-      case alarm_tripped:   nextState = alarm_notifying;
-      break;
-      case alarm_notifying: nextState = alarm_clearing;
-      break;
-      case alarm_clearing:  nextState = alarm_armed;
-      break;
-    }
-
-  }
-  #ifdef SERIAL_DEBUGXX
-    Serial.print("  nextState=");
-    Serial.println(alarm_state_name_def[nextState]);
-  #endif
-  alarm1.setState(nextState);
-  //do_master_send = currentState != nextState; //OR checkTime ??
-  if(currentState != nextState) do_master_send = TRUE; //OR from checkTime
+  if(sensor.hasChangedSensor()) do_master_send = TRUE; //OR from checkTime
   if(do_master_send) {
     //data format:
     //messageid@A@hh:mm:ss@sensor-name@reading$
     char sensordata[80]; //SIZE??
-    //bool remoteIsTripped = alarm1.formatRemoteTrip(sensordata);
-    //char remoteCondition = remoteIsTripped ? 'A' : 'I';
-    //Clear, Tripped, Reset
-    uint8_t remoteIsTripped = alarm1.formatRemoteTrip(sensordata);
-    #ifdef SERIAL_DEBUGXX
-    Serial.print("formatted sensorData=");
-    Serial.print(sensordata);
-      Serial.print("  remoteIsTripped=");
-      Serial.println(remoteIsTripped);
-    #endif
-    //0=C 1=T 2=S 3=R
-    char remoteCondition;
-    //switch(remoteIsTripped){
-    switch(nextState) {
-      case alarm_armed: remoteCondition = 'A';
-      break;
-      case alarm_tripped: remoteCondition = 'T';
-      break;
-      case alarm_notifying: remoteCondition = 'N';
-      break;
-      case alarm_clearing: remoteCondition = 'R';
-      break;
-      default: remoteCondition = 'I';
-    }
-    #ifdef SERIAL_DEBUGXX
-      Serial.print("remoteCondition=");
-      Serial.println(remoteCondition);
-    #endif
 
-    String time = Time.format("%H:%M:%S");
-    sprintf(data,"%d@%d@%c@%s",msgSeq++,sys.getSysId(),remoteCondition,time.c_str());
-//---xxxxyy
-    strcat(data,sensordata);
-    strcat(data,"$");
-    String rData = String(data);
+    String time = Time.format("%H:%M:%S%S");
+    sprintf(data,"%d@%d@%c@%s",msgSeq++,sys.getSysId(),t,time.c_str(),changed.c_str());
+    String rData = String(data) + changed;
+#define REMOTE_DEBUG_NO_MASTER
+#ifdef REMOTE_DEBUG_NO_MASTER
+    Particle.publish("rtestdata", rData);
+#else
     Particle.publish("remotedata", rData);
-    /* REMOVE--------------------
-    //debug / test Parse class
-    Parse p(rData);
-    int parse_cnt;
-    Serial.println("Parse class test:");
-    Serial.print("rData: ");
-    Serial.println(p.getData());
-    parse_cnt = p.doParse();
-    Serial.print("parsed ");
-    Serial.print(parse_cnt);
-    Serial.println(" items");
-    for(int i=0; i< parse_cnt; i++) {
-      Serial.println(p.getElement(i));
-    }
-    Serial.println("end of items");
-    //END REMOVE--------------------
-    */
+#endif
+#ifdef SERIAL_DEBUGXX
+    Serial.print("remotedata=");
+    Serial.print(rData);
+#endif
     alarm1.clearSensorReported();
     digitalWrite(MESSAGE_PIN, HIGH);       //blink red led on publish
-    delay(LOOP_DELAY_TIME); //use two delays to show led
+    delay(REMOTE_LOOP_DELAY_TIME); //use two delays to show led
   }
-  delay(LOOP_DELAY_TIME);
-  digitalWrite(MESSAGE_PIN, LOW);       //blink red led on publish
   #ifdef SERIAL_LOOP_WAIT
     while(!Serial.available())  // Wait here until the user presses ENTER
       Spark.process();          // in the Serial Terminal. Call the BG Tasks
     Serial.read();
+  #else
+    delay(REMOTE_LOOP_DELAY_TIME);
   #endif
+  digitalWrite(MESSAGE_PIN, LOW);       //blink red led on publish
+  nextState = remoteState;
 }
 #endif  //PHOTON_REMOTE

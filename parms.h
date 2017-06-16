@@ -24,7 +24,7 @@
 //which configuration?  (ONLY ONE)
 //Testing Master-Remote WITH Shed as master
 #ifdef PHOTON_MASTER
-#define EE_MAGIC_CONFIG 0X34        // change this to write new test config
+#define EE_MAGIC_CONFIG 0X3D        // change this to write new test config
 #define EE_MAGIC_STATE 0x34
 #define PUSHOVER_SEND_MESSAGES      //actually send Pushover Messages
 #define WORRY_MINUTES 5             //time between follow-up notifications
@@ -34,7 +34,7 @@
 #ifdef PHOTON_REMOTE
 #define REMOTE_SYSTEM_ID 1
 #define SHED_CONFIGURATION
-#define EE_MAGIC_CONFIG 0X2a        // change this to write new test config
+#define EE_MAGIC_CONFIG 0X30        // change this to write new test config
 #define EE_MAGIC_STATE 0x03
 //#define PUSHOVER_SEND_MESSAGES      //DEBUG?? actually send Pushover Messages
 #define WORRY_MINUTES 5             //time between follow-up notifications
@@ -47,14 +47,17 @@
 #endif
 //config for neshed
 #ifdef HOME_CONFIGURATION
-#define MAXDEVICE 7
+#define MAXDEVICE 10
 #define TEST_SENSOR_1   //mcp9808
-#define TEST_SENSOR_9   //MOTION -- DS2413 sw ontest board
+#define TEST_SENSOR_9   //FRONT DOOR
 #define TEST_SENSOR_10  //basement water
 #define TEST_SENSOR_13  //Remote SHED door
 #define TEST_SENSOR_14  //Remote Outside Temp
 #define TEST_SENSOR_16  //boiler temp
-#define TEST_SENSOR_20  //smoke detector
+#define TEST_SENSOR_20  //GARAGE DOORS
+#define TEST_SENSOR_21  //DINING ROOM IR
+#define TEST_SENSOR_23  //INSIDE DOORS
+#define TEST_SENSOR_24  //FAMILY RM SMOKE DETECTOR
 #endif
 //config for breadboard remote unit
 #ifdef SHED_CONFIGURATION
@@ -65,8 +68,9 @@
 
 #define OUTSIDE_THERMOMETER_IDX 5   //for now use boiler temp
 #define SENSOR_LIST_SCAN
-#define ALERT_HOURS 3               //no longer used ??
+#define ALERT_HOURS 1               //??TESTING, S/B longer (3 or 6)
 #define LOOP_DELAY_TIME 250         //Delay ms between loop passes
+#define REMOTE_LOOP_DELAY_TIME 1000 //Delay ms between Loop on Remotes
 #define MAX_ALARM_NOTIFIED 1000     //Global limit on published alarms (DEBUG limit                        )
 #define SYSTEM_STATUS_PIN D2        //RED if Armed, Blinking if any tripped
 #define SYSTEM_NOTIFICATION_PIN D3  //GREEN blinks at each loop ??
