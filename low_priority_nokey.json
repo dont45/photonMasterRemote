@@ -1,0 +1,14 @@
+{
+  "event":"low_priority",
+  "url": "https://api.pushover.net/1/messages.json",
+  "requestType": "POST",
+  "query":
+  {
+    "user":  "xxxxxxx user key here xxxxxxxx",
+    "token": "xxxxxx ap token here xxxxxxxxx",
+    "title": "INFO",
+    "message": "{{SPARK_EVENT_VALUE}}",
+    "priority": -1
+  },
+  "mydevices": true
+}
