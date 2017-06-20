@@ -38,13 +38,13 @@ typedef enum {NO_HEADER=0, SHORT_HEADER=1, FULL_HEADER=2};
 //Message name conflicts with
 struct pMessage {
   uint8_t header_style;
-  uint8_t priority;
+  int priority;
   String message_text;
 };
 
  class Notifier {
  public:
-   Notifier(char *event_name, char *priority_event_name, char *emergency_event_name, Sensor *s) {
+   Notifier(char *lopri_event_name, char *event_name, char *priority_event_name, char *emergency_event_name, Sensor *s) {
      // move upd to Alarm class ??
      Particle.function("upd", &Notifier::upd, this);
      //Particle.function("set", &Notifier::set, this);  //old xxxxyy, remove
@@ -52,6 +52,7 @@ struct pMessage {
      Particle.function("confirm", &Notifier::confirm, this);
      //Particle.function("dump", &Notifier::dump, this); xxxxyy
      //TODO use array for webhook_id
+     strcpy(low_pri_webhook_id, lopri_event_name);
      strcpy(webhook_id, event_name);
      strcpy(priority_webhook_id, priority_event_name);
      strcpy(emergency_webhook_id, emergency_event_name);
@@ -89,6 +90,7 @@ struct pMessage {
    std::map <int, String> command_list;
    //std::queue<String> msg_queue;
    std::queue<pMessage> message_queue; // replaces msg_queue (with priority)
+   char low_pri_webhook_id[20];
    char webhook_id[20];
    char priority_webhook_id[20];
    char emergency_webhook_id[20];

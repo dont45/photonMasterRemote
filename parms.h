@@ -24,8 +24,8 @@
 //which configuration?  (ONLY ONE)
 //Testing Master-Remote WITH Shed as master
 #ifdef PHOTON_MASTER
-#define EE_MAGIC_CONFIG 0X3D        // change this to write new test config
-#define EE_MAGIC_STATE 0x34
+#define EE_MAGIC_CONFIG 0X3F        // change this to write new test config
+#define EE_MAGIC_STATE 0X3F
 #define PUSHOVER_SEND_MESSAGES      //actually send Pushover Messages
 #define WORRY_MINUTES 5             //time between follow-up notifications
 #define HOME_CONFIGURATION
@@ -66,9 +66,11 @@
 #define TEST_SENSOR_15  //mcp9808
 #endif
 
+#define CHECKIN_EMERGENCY_MESSAGE  "DON FAILED TO CHECK IN "
 #define OUTSIDE_THERMOMETER_IDX 5   //for now use boiler temp
 #define SENSOR_LIST_SCAN
 #define ALERT_HOURS 1               //??TESTING, S/B longer (3 or 6)
+#define CHECKIN_HOURS 0b000010000100010000000000;  //10am 2pm 7pm
 #define LOOP_DELAY_TIME 250         //Delay ms between loop passes
 #define REMOTE_LOOP_DELAY_TIME 1000 //Delay ms between Loop on Remotes
 #define MAX_ALARM_NOTIFIED 1000     //Global limit on published alarms (DEBUG limit                        )

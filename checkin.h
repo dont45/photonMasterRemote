@@ -28,36 +28,43 @@
 #define __CHECKIN_H__
 
 #define TIME_BETWEEN_CHECKIN 3600 //MINIMUM TIME BETWEEN
-#define RESPOND_TO_CHECKIN 1800   //MUSTe RESPOND WITHIN
-#define EMERGENCY_NOTICE_MAX 2    //MAX TIMES EMERGENCY SENT 
+//#define RESPOND_TO_CHECKIN 1800 //MUSTe RESPOND WITHIN
+#define TIME_TO_PANIC 3600        //1 HOUR to perform checkin
+#define TIME_TO_NOTICE 300        //5 Minutes after final "CHECKIN IMMEDIATELY"
+#define EMERGENCY_NOTICE_MAX 2    //MAX TIMES EMERGENCY MESSAGE SENT
 #include "application.h"
 #include "parms.h"
 
 class Checkin {
 public:
   Checkin();
+  Checkin(unsigned long);
   void setCheckinTime(int);
-  void setPanicTime(int);
+  //void setPanicTime(int);
+  //void setNoticeTime(int);
   void setPanicMode();
   bool inPanicMode();
   void userCheckin();     // perform user checkin
   bool checkinThisHour(uint8_t); // should we perform checkin, based on hour mask
-  void setCheckinHour(int h);
-  int getCheckinTime();
-  int getPanicTime();
+  void addCheckinHour(int h);
+  void setCheckinHours(unsigned int);
   bool timeExpired();     //has eheckin_time arrived?
   bool panicExpired();    //has panic_time arrived?
+  bool noticeExpired();   //NOW send emergency
   void reset();           //reset panic state
   String showCheckinHours();
   void setSuspended(uint8_t); //suspend up to 24 hours
+  unsigned long getCheckinHours();
   //DEBUG
   String showCheckinTime();
   String showPanicTime();
+  String showNoticeTime();
 private:
   unsigned long hours_to_checkin;  //bitmask of hours
   //zero means NOT set, else Time until event:
   int checkin_time; //time until checkin request sent
-  int panic_time; //time to send to emergency list
+  int panic_time;   //sent final urgent checkin notices
+  int notice_time;  //time to send to emergency list
   int suspend_until;  //suspend all checkins until this time (max xx hours?)
   uint8_t in_panic;   //times panic sent, limit to 2??
 };

@@ -25,12 +25,18 @@
 // e.g. ALL IS WELL, I'M PLAYING GOLF WITH FRIENDS
 #include "checkin.h"
 
-Checkin::Checkin() {
-  //                   22221111111111
-  //hours:             321098765432109876543210
-  hours_to_checkin = 0b000010000100010000000000;  //10am 2pm 7pm
+Checkin::Checkin() {}
+Checkin::Checkin(unsigned long hours) {
+  //                     22221111111111
+  //hours:               321098765432109876543210
+  //hours_to_checkin = 0b000010000000000010000000;  //7am  7pm
+  hours_to_checkin = hours;
+  if(!hours_to_checkin)
+    hours_to_checkin = 0b000010000000000010000000;  //10am 2pm 7pm
+
   checkin_time = Time.now() + TIME_BETWEEN_CHECKIN;
   panic_time = 0;  // zero means NOT set
+  notice_time = 0;
   suspend_until = 0;
   in_panic = 0;
 }
@@ -39,23 +45,33 @@ Checkin::Checkin() {
 void Checkin::userCheckin() {
   checkin_time = Time.now() + TIME_BETWEEN_CHECKIN;
   panic_time = 0;
+  notice_time = 0;
 }
 //check if hour h is set in bitmask
 bool Checkin::checkinThisHour(uint8_t h) {
   unsigned long hours = (hours_to_checkin >> h);
   return hours & 1;
 }
+
 void Checkin::setCheckinTime(int t) {
   checkin_time = t;
   panic_time = 0;
+  notice_time = 0;
 }
+/*
 void Checkin::setPanicTime(int t) {
   panic_time = t;
 }
-
+void Checkin::setNoticeTime(int t) {
+  notice_time = t;
+}
+*/
+void Checkin::setCheckinHours(unsigned int hours) {
+  hours_to_checkin = hours;
+}
 // set or clear this hour from hours_to_checkin
 // set if positive, clear if negative
-void Checkin::setCheckinHour(int h) {
+void Checkin::addCheckinHour(int h) {
   bool toSet = h > 0;
   h = abs(h);
   unsigned long setMask = 1 << h;
@@ -74,17 +90,35 @@ bool Checkin::timeExpired() {
     checkin_time = suspend_until;
     return FALSE;
   } else suspend_until = 0;
-  if((Time.now()) > checkin_time) { //give a couple of minutes grace (120 sec)
-    //checkin_time = 0; //here?? NO
+  if((Time.now()) > checkin_time) {
+    checkin_time = Time.now() + TIME_BETWEEN_CHECKIN; //no more for now
+    panic_time = Time.now() + TIME_TO_PANIC;   //5 min to do checkin
     return TRUE;
   }
   return FALSE;
 }
 
+//TODO: Once expired, send two fast 'last chance to checkin' messages
+// before emertency alert ??
 bool Checkin::panicExpired() {
   if(!panic_time) return FALSE;
   if(Time.now() > panic_time) {
-    //panic_time = 0; //here??
+    //moved from main
+    panic_time = Time.now() + TIME_BETWEEN_CHECKIN; //no more for now
+    notice_time = Time.now() + TIME_TO_NOTICE;   //2 min to NOTICE
+    return TRUE;
+  }
+  return FALSE;
+}
+//send actual notice
+bool Checkin::noticeExpired() {
+  if(!notice_time) return FALSE;
+  if(Time.now() > notice_time) {
+    setPanicMode(); //count times panic sent, limited to 2??
+    //ONLY setCheckinTime if NOT panicMode ??
+    checkin_time = Time.now() + TIME_BETWEEN_CHECKIN; //no more for now
+    panic_time = 0; //no more for now
+    notice_time = 0;
     return TRUE;
   }
   return FALSE;
@@ -98,6 +132,7 @@ bool Checkin::inPanicMode() {
 
 void Checkin::reset() {
   in_panic = 0;
+  setCheckinTime(Time.now() + TIME_BETWEEN_CHECKIN);
 }
 //suspend further checkins up to 12 hours
 void Checkin::setSuspended(uint8_t hrs) {
@@ -105,31 +140,40 @@ void Checkin::setSuspended(uint8_t hrs) {
   suspend_until = Time.now() + 3600 * hrs;
 }
 
-int Checkin::getCheckinTime() {
-  return checkin_time;
+unsigned long Checkin::getCheckinHours() {
+  return hours_to_checkin;
 }
-int Checkin::getPanicTime() {
-  return panic_time;
-}
+
+//combine these three into ONE
 String Checkin::showCheckinTime() {
-  String nextAt("next checkin at: ");
+  String nextAt("\\ncheckin_time ");
   //Serial.print("next checkin at: ");
   if(checkin_time)
-    //nextAt += Time.format(checkin_time, "%I:%M%p");  //03:21AM
     nextAt += Time.format(checkin_time, TIME_FORMAT_DEFAULT);  //03:21AM
   else
     nextAt += "not set";
+    //nextAt = "";
   return nextAt;
 }
 String Checkin::showPanicTime() {
-  String nextPt("panic at: ");
+  String nextPt("\\npanic_time ");
   //Serial.print("panic at: ");
   if(panic_time)
     nextPt += Time.format(panic_time, TIME_FORMAT_DEFAULT);  //03:21AM
   else
-    nextPt += "not set";
-  //Serial.println(nextPt);
+    //nextPt += "not set";
+    nextPt = "";
   return nextPt;
+}
+String Checkin::showNoticeTime() {
+  String nextPt("\\nnotice_time ");
+  //Serial.print("panic at: ");
+  if(notice_time)
+    nextPt += Time.format(notice_time, TIME_FORMAT_DEFAULT);  //03:21AM
+  else
+    //nextPt += "not set";
+    nextPt = "";
+    return nextPt;
 }
 //show hours_to_checkin as 7am,10am,8pm
 String Checkin::showCheckinHours() {

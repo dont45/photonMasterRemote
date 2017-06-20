@@ -67,6 +67,11 @@
 
  /*
   * Added in v3.2
+  * Stopped writing saved state to EEPROM, use SAV command instead.
+  * This is to preserve EEProm Write cycle until state is moved.
+  * Going away long term, do commands SET AWAY, then SAV.
+  * Short term SET / DIS sequence does NOT save state
+  *
   * Checkin -- A system to monitor 'users' health via a required periodic
   * checkin.
   *   The genisis of this system was my 8 week camping trip where I was almost
@@ -677,10 +682,13 @@ char* Sensor::romFormat(char *buf, uint8_t rom[]) {
 
 Sensor sensor(&ow);
 
+#ifdef PHOTON_MASTER
 // notify hours quiet hours, alarm does not
 #include "checkin.h"
-Checkin checkin;
-Notifier notify("shed_notice","shed_alarm","emergency", &sensor);
+Checkin checkin(alarm_saved_state.checkin_hours);
+#endif
+Notifier notify("low_priority","shed_notice","shed_alarm","emergency", &sensor);
+//Notifier notify("shed_notic_e","shed_notice","shed_alarm","emergency", &sensor);
 
 #include "alarm.h"
 
@@ -1927,6 +1935,7 @@ bool Alarm::writeSavedState() {
   alarm_saved_state.current_state = isArmed();
   alarm_saved_state.current_location = curLocation;
   alarm_saved_state.alert_hours = notify.getAlertHours();
+  alarm_saved_state.checkin_hours = checkin.getCheckinHours();
   alarm_saved_state.oil_gallons = gallonsO;
   alarm_saved_state.event_sequence = event_sequence;
 #ifdef SERIAL_DEBUG
@@ -2235,42 +2244,28 @@ bool Notifier::checkTime() {
   if(elapsedminutes < 0) elapsedminutes += 60;
   if(elapsedminutes >= WORRY_MINUTES) {
     elapsedminutes = minute;
-    //check = TRUE;
   }
   min_hours_between = max(1,hours_between_alert);
   tempHour = hour;
   if(tempHour < lasthour) tempHour += 24;
-  if(!checkin.inPanicMode() && checkin.panicExpired()) {
-    queueMessage(NO_HEADER, 2, "DON FAILED TO CHECKIN");
-    //first send msg to don
-    //and set emergency notification time to now + margin
-    checkin.setCheckinTime(Time.now() + 3600); //no more for now
-    checkin.setPanicTime(0); //no more for now
-    checkin.setPanicMode(); //count times panic sent, limited to 2??
+#ifdef PHOTON_MASTER
+  if(checkin.panicExpired()) {
+    queueMessage(NO_HEADER, 1, "CHECKIN IMMEDIATELY");
+    queueMessage(NO_HEADER, 1, "CHECKIN IMMEDIATELY");
+    queueMessage(NO_HEADER, 1, "CHECKIN IMMEDIATELY");
+  }
+  if(!checkin.inPanicMode() && checkin.noticeExpired()) {
+    queueMessage(NO_HEADER, 2, CHECKIN_EMERGENCY_MESSAGE);
   }
   //check for checkin timeout every hour
   if(tempHour - lasthour >= 1) {
-    //TODO: 1) add grace to expired time ?? or already included?
-    //      2) first send me an alert
-    //      2) reset timer to what??
-    // first alert should be to don, followed by emergency list
-    // first check if we should check in THIS hour:
     if(checkin.checkinThisHour(tempHour)) {
       if(checkin.timeExpired()) {
         queueMessage(NO_HEADER, 1, "CHECKIN NOW");
-#ifdef SERIAL_DEBUGXX
-        String tmp = checkin.showCheckinTime();
-        queueMessage(NO_HEADER, 1, tmp);
-        tmp = checkin.showPanicTime();
-        queueMessage(NO_HEADER, 1, tmp);
-#endif
-        //first send msg to don
-        //and set emergency notification time to now + margin
-        checkin.setCheckinTime(Time.now() + TIME_BETWEEN_CHECKIN); //no more for now
-        checkin.setPanicTime(Time.now() + TIME_BETWEEN_CHECKIN);   //5 min to do checkin
       }
     }
   }
+#endif
   //if hours_between_alert = 4  {4,8,12}
   //FIRST TIME EARLY: LAST_HOUR 3
   //if hours_between_alert is zero, don't alert but do log temp hourly
@@ -2323,22 +2318,19 @@ String Notifier::updData() {
   }
   sprintf(buf,"\\nworry hours %d",hours_between_alert);
   msg.concat(buf);
-
-  sprintf(buf,"\\ncheckin hours ");
-  msg.concat(buf);
+#ifdef PHOTON_MASTER
+  msg.concat("\\ncheckin hours ");
   String hrs = checkin.showCheckinHours();
   msg.concat(hrs.c_str());
-#ifdef SERIAL_DEBUGXX
-  sprintf(buf,"\\nnext  ");
-  msg.concat(buf);
-  String ct = Time.format(checkin.getCheckinTime(), "%I:%M%p");
-  msg.concat(ct.c_str());
-  sprintf(buf,"\\npanic ");
-  msg.concat(buf);
-  String pt = Time.format(checkin.getPanicTime(), "%I:%M%p");
-  msg.concat(pt.c_str());
+#ifdef SERIAL_DEBUG
+  String tfmt = checkin.showCheckinTime();
+  msg.concat(tfmt.c_str());
+  tfmt = checkin.showPanicTime();
+  if(tfmt.length() > 1) msg.concat(tfmt.c_str());
+  tfmt = checkin.showNoticeTime();
+  if(tfmt.length() > 1) msg.concat(tfmt.c_str());
 #endif
-
+#endif
   ts = alarm1.firstTripped();
   if(ts != NULL) {
     //SHOULD do all tripped, not just first
@@ -2364,12 +2356,12 @@ typedef enum {CMD_HLP, CMD_ABT, CMD_TMP, CMD_CIN, CMD_CAN,
               CMD_PAN, CMD_CIR, CMD_CIS, CMD_CIH, CMD_SET,
               CMD_DIS, CMD_ACK, CMD_HOM, CMD_AWA, CMD_HOU,
               CMD_LIS, CMD_NAM, CMD_SEN, CMD_ACT, CMD_DEA,
-              CMD_MIN,CMD_MAX,CMD_EVT,CMD_CFG};
+              CMD_MIN, CMD_MAX, CMD_EVT, CMD_CFG, CMD_SAV};
 const String Notifier::commands =
-      String("HLP.ABT.TMP.CIN.CAN.PAN.CIR.CIS.CIH.SET.DIS.ACK.HOM.AWA.HOU.LIS.NAM.SEN.ACT.DEA.MIN.MAX.EVT.CFG.");
+      String("HLP.ABT.TMP.CIN.CAN.PAN.CIR.CIS.CIH.SET.DIS.ACK.HOM.AWA.HOU.LIS.NAM.SEN.ACT.DEA.MIN.MAX.EVT.CFG.SAV.");
 //            0   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15  16  17  18  19  20  21  22  23
-#define COMMAND_NO_CONFIRM 4
-#define COMMAND_ZERO_CONFIRM 5
+#define COMMAND_NO_CONFIRM 4      //THESE COMMANDS DO NOT REQUIRE A CONFIRMATION
+#define COMMAND_ZERO_CONFIRM 5    //THESE FORCE A ZERO CONFIRMATION NUMBER
 
 int Notifier::request(String cmd_line) {
   char msg[20];
@@ -2404,7 +2396,7 @@ int Notifier::request(String cmd_line) {
   sprintf(msg, " Confirmation: %d", new_secret);
   //int tpri = 2;
   //sprintf(msg, "Confirmation:\"%d,\"priority\":%d", new_secret, tpri);  //\n
-  queueMessage(NO_HEADER,1,msg);
+  queueMessage(NO_HEADER,-1,msg);   //XXXXXXXXX
   return 1;
 }
 
@@ -2437,7 +2429,7 @@ int Notifier::confirm(String secret) {
   std::map <int, String>::iterator mi;
   int secret_index = secret.toInt();
   if(bad_secret_cnt >= BAD_SECRET_MAX) {
-    queueMessage(NO_HEADER,1,"TOO MANY BAD SECRETS");  //debug message
+    queueMessage(NO_HEADER,0,"TOO MANY BAD SECRETS");  //debug message
     command_list.clear();
     return 0;
   }
@@ -2451,7 +2443,7 @@ int Notifier::confirm(String secret) {
   // this is really bad secret
   sprintf(buf, "\\nInvalid Confirmation #: %d\\n", secret_index );
   bad_secret_cnt++;
-  queueMessage(NO_HEADER,1,buf);
+  queueMessage(NO_HEADER,0,buf);
   return 0;
 }
 
@@ -2546,7 +2538,7 @@ int Notifier::do_command(String cmd_line) {
       strcat(listing_buffer,"\\nDonald Thompson");
       sprintf(msg,"\\nVersion %d.%d.%d", SYSTEM_VERSION_MAJOR, SYSTEM_VERSION_MINOR, SYSTEM_VERSION_SUB);
       strcat(listing_buffer, msg);
-      queueMessage(NO_HEADER,1,listing_buffer);
+      queueMessage(NO_HEADER,0,listing_buffer);
       break;
     case CMD_TMP : //TMP Display All Thermometers
         alarm1.thermometerListing(listing_buffer);
@@ -2557,9 +2549,8 @@ int Notifier::do_command(String cmd_line) {
         // PERFOMR user checkin, i.e. cancal pending 'panic'
         checkin.userCheckin();
         // should have return status and show if completed or too late ??
-        queueMessage(NO_HEADER,1,"CHECKIN COMPLETED");
+        queueMessage(NO_HEADER,0,"CHECKIN COMPLETED");
         return 1;
-        break;
         break;
     case CMD_CAN :  //cancel 'panic' and all other pending commands
         command_list.erase(0);
@@ -2572,7 +2563,7 @@ int Notifier::do_command(String cmd_line) {
         break;
     case CMD_CIR :  //checkin reset, go out of panic mode
         checkin.reset();
-        queueMessage(SHORT_HEADER,1,"CHECKIN REENABLED");
+        queueMessage(SHORT_HEADER,0,"CHECKIN REENABLED");
         return 1;
         break;
   case CMD_CIS :  //SUSPEND CHECKINS for XX HOURS
@@ -2582,14 +2573,17 @@ int Notifier::do_command(String cmd_line) {
         break;
     case CMD_CIH :  //set or clear checkin hours
         if(p1 > 23 || p1 < -23 || p1==0) return 0;
-        checkin.setCheckinHour(p1);
+        checkin.addCheckinHour(p1);
         queueMessage(NO_HEADER,1,"CHECKIN HOUR SET");
+        alarm_saved_state.checkin_hours = checkin.getCheckinHours();
+        //alarm1.writeSavedState();
         return 1;
+        break;
     case CMD_SET : // SET Alarm state to enabled
         //command = 'SET <secret>'
           // set unless tripped
         if(alarm1.setState(alarm_armed)) {
-            alarm1.writeSavedState();
+            //alarm1.writeSavedState();
             #ifdef SERIAL_DEBUG
               Serial.print('set armed');
             #endif
@@ -2601,7 +2595,7 @@ int Notifier::do_command(String cmd_line) {
         //command = 'DISARM <secret>'
         // DISABLE alarm here!!
         if(alarm1.setState(alarm_disarmed)) {
-          alarm1.writeSavedState();
+          //alarm1.writeSavedState();
           queueMessage(SHORT_HEADER,alarm1.getPriority(),alarm1.getPendingMessage());
         }
         return 1;
@@ -2835,6 +2829,10 @@ int Notifier::do_command(String cmd_line) {
               strcpy(msg, "CFG Not Implemented");
               queueMessage(NO_HEADER,1,msg);
           break;
+      case CMD_SAV : // Write alarm_saved_state to EEPROM
+          if(alarm1.writeSavedState()) queueMessage(NO_HEADER, 0, "STATE SAVED");
+          return 1;
+          break;
       default:   // Error
           queueMessage(NO_HEADER,1,"UNRECOGNIZED COMMAND");
           return 0;
@@ -2934,7 +2932,7 @@ void Notifier::setAlertHours(int hours) {
   lasthour = Time.hour() - 1;
   if(lasthour < 0) lasthour = 23;
   hours_between_alert = hours;
-  alarm1.writeSavedState();
+  //alarm1.writeSavedState();  //use CMD SAV to write to eeprom
 }
 uint8_t Notifier::getAlertHours() {
   return hours_between_alert;
@@ -3044,8 +3042,7 @@ String mdata = String::format(
   // TODO - make  webhook_id an array rather than this switch
   switch(pri) {
     case -1:  //with no sound or viberate
-         Serial.print(" pri=-1?");
-         //TODO:
+         Spark.publish(low_pri_webhook_id, event_message, 60, PRIVATE);
          break;
     case 0:
           Serial.print(" publish ");
@@ -3170,6 +3167,8 @@ void setup() {
       alarm_saved_state.current_state = alarm_disarmed;
       alarm_saved_state.event_sequence = 1000;
       alarm_saved_state.alert_hours = ALERT_HOURS;
+      alarm_saved_state.checkin_hours = CHECKIN_HOURS;
+
       alarm1.writeSavedState();
     }
     else {
@@ -3179,6 +3178,7 @@ void setup() {
       #endif
     }
     notify.setAlertHours(alarm_saved_state.alert_hours);
+    checkin.setCheckinHours(alarm_saved_state.checkin_hours);
     if(!alarm1.readConfiguration()) {
       notify.queueMessage(SHORT_HEADER,1,"FAILED");
       #ifdef SERIAL_DEBUG

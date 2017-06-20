@@ -44,8 +44,9 @@ const char* sensor_state_def[3] = {"deactivated", "active","inactive"};
 const char* sensor_use_def[12] = {"undefined","user key", "master key","switch","ow switch","ow indicator","ow relay","ow thermometer",
           "mcp9808 therm", "remote alarm", "oil level", "remote monitor"};
 const char* sensor_sense_def[2] = {"normal closed", "normal open"};
+const char* sensor_level_def[2] = {"home", "away"};
 const char* sensor_use_descr[] = {"undefined","user-key","master-key","switch", "ow-sensor","ow-indicator","ow-relay","ow-thermometer",
-              "mcp9808-thermometer","sub-remote-alarm","sub-oil-level","remote car monitor" };
+              "mcp9808-thermometer","sub-remote-therm","sub-remote-alarm","sub-oil-level","remote car monitor" };
 //device flag bit definitions
 //YELLOW = caution state, i.e. oil level warning; RED = critical state, i.e. OIL critically low
 typedef enum {DEVICE_PRIORITY=0, DEVICE_YELLOW=1, DEVICE_RED=2};
@@ -58,6 +59,7 @@ struct state_t
   int event_sequence;
   uint8_t alert_hours;
   float oil_gallons; // or level ??
+  unsigned long checkin_hours;  //bitmap of hours to perform checkin.
 }
 alarm_saved_state;
 #define ALARM_STATE_ADDRESS 0
