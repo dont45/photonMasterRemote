@@ -1,0 +1,38 @@
+//photonMasterRemote design
+
+//November 16, 2017
+
+Add Sensor type ALWAYS_DEVICE, now {HOME_DEVICE, ALWAYS_DEVICE, ALWAYS}
+Purpose: smoke-detector, water detector, remotes run when 'house Master' is
+disabled.
+
+Add New Alarm State OFF, now {OFF, DISABLED, HOME, AWAY}
+Purpose: OFF is old DISABLED, DISABLED is off except for ALWAYS sensors,
+i.e. smoke-detectors etc.
+u
+//June 28, 2017
+
+Garage Door Opener
+
+Add to Sensor class or develop a new class??
+
+Separate Door Sensors or Add new Sensors ??
+
+Hardware Design:
+Use ds2406 device:  Add new device type
+PIO-B is door sensor
+PIO-A is door button control
+gpio port connects to one-show multivibrator to generate a 1/2 second pulse
+pulse drives a 2n3904 which drives a relay, which is connected across button
+
+Class properties:
+canOpen : door control is allowed
+canClose:
+
+Class methods:
+getDoorState() : read door state
+openDoor() : open door, only if 1) Alarm is OFF, 2) door is closed, 3)door control is enabled
+closeDoor() : close door, only if 1) door is open, 2) canClose is TRUE
+pressDoorButton() : generate short pulse to PIO-A
+doorDidClose() : follow up check of PIO-B that door closed, then send message
+doorDidOpen() : follow up

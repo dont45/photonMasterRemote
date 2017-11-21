@@ -22,6 +22,7 @@
 
 State::State(){
     status = 0;
+    remoteStatus = 0;   // DESIGN: read from eeprom ??
     ledNoticeState = 0;
     startTime = Time.now();
 }
@@ -86,6 +87,10 @@ void State::addStatus(uint8_t sbit) {
 uint8_t State::sysStatus() {
   return status;
 }
+
+bool State::owPresent() {
+  return !(status & fail_ds2482);
+}
 int State::upTime() {
   return Time.now() - startTime;
 }
@@ -107,9 +112,28 @@ char* State::upTime(char* upTimeStr) {
   return upTimeStr;
 }
 
+void State::setRemoteStatus(uint8_t remoteId, bool newState) {
+  if(newState)
+    remoteStatus |= 1 << remoteId;
+  else
+    remoteStatus &= ~(1 << remoteId);
+}
+bool State::getRemoteStatus(uint8_t remoteId) {
+  return (remoteStatus >> remoteId) & 1;
+}
+
 void State::setSysId(uint8_t id) {
   sysId = id;
 }
+
+void State::setRemotes(uint8_t rv) {
+  remoteStatus = rv;
+}
+
+uint8_t State::getRemotes() {
+  return remoteStatus;
+}
+
 uint8_t State::getSysId() {
   return sysId;
 }

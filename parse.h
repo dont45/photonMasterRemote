@@ -35,8 +35,9 @@
 
 #define MAX_PARSED_ITEMS 8
 #define ELEMENT_DELIMITER '@'
-#define FIELD_DELIMITER ':'
 #define END_DELIMITER '$'
+#define FIELD_DELIMITER ':'
+#define FIELD_END '^'
 
 class Parse {
 public:
@@ -45,6 +46,7 @@ public:
   int doParse();
   void setData(String);
   void setData(char, char, String);
+  void setDelimiters(char, char);
   String getData();
   String getElement(int);
 private:

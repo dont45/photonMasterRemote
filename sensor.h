@@ -42,14 +42,17 @@ public:
     pinMode(MOTION_LOOP_SENSOR_PIN,INPUT);
     pinMode(TAMPER_PIN,INPUT);
     pinMode(MESSAGE_PIN,OUTPUT);
+    trippedSensor = FALSE;
   }
   bool readSensor(device_t &d);
+  void setDeviceActive(device_t *d, bool);
   void setSensorIndicator(device_t d, uint8_t val);
   float readTemperature();
   float getLastTemperature();
   void clearChangedSensors();
   void addChangedSensor(device_t);
   bool hasChangedSensor();
+  bool hasTrippedSensor();
   //xxx getChangedSensors();
   String fmtChangedSensors();
 
@@ -59,5 +62,6 @@ private:
   std::list<device_t> changedList;  //sensor has changed state since last read
   float last_temp;
   float last_oil_level;
+  bool trippedSensor;
 };
 #endif

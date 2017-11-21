@@ -146,7 +146,7 @@ unsigned long Checkin::getCheckinHours() {
 
 //combine these three into ONE
 String Checkin::showCheckinTime() {
-  String nextAt("\\ncheckin_time ");
+  String nextAt("\ncheckin_time ");
   //Serial.print("next checkin at: ");
   if(checkin_time)
     nextAt += Time.format(checkin_time, TIME_FORMAT_DEFAULT);  //03:21AM
@@ -156,7 +156,7 @@ String Checkin::showCheckinTime() {
   return nextAt;
 }
 String Checkin::showPanicTime() {
-  String nextPt("\\npanic_time ");
+  String nextPt("\npanic_time ");
   //Serial.print("panic at: ");
   if(panic_time)
     nextPt += Time.format(panic_time, TIME_FORMAT_DEFAULT);  //03:21AM
@@ -166,7 +166,7 @@ String Checkin::showPanicTime() {
   return nextPt;
 }
 String Checkin::showNoticeTime() {
-  String nextPt("\\nnotice_time ");
+  String nextPt("\nnotice_time ");
   //Serial.print("panic at: ");
   if(notice_time)
     nextPt += Time.format(notice_time, TIME_FORMAT_DEFAULT);  //03:21AM

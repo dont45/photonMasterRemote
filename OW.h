@@ -25,8 +25,9 @@
 #ifndef __OW_H__
 #define __OW_H__
 
-#define SERIAL_DEBUG
-#define SERIAL_DEBUGXX
+//no defines here!
+//#define SERIAL_DEBUG
+//#define SERIAL_DEBUGXX
 //#define SERIAL_DEBUG_OW
 //#define SERIAL_DEBUG_THERM
 //#include <inttypes.h>

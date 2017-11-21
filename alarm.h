@@ -33,8 +33,9 @@
 // Alarm states xxx  FIX:???
 // need two states: alarm_state; DISARMED, armed
 // and sensor_state: clear, tripped, notified
-typedef enum {alarm_disarmed=0,alarm_armed=1,alarm_tripped=2,alarm_notifying=3,alarm_clearing=4,alarm_reported=5};
-const char* alarm_state_name_def[6] = {"DISARMED", "Armed", "TRIPPED", "NOTIFY", "CLEAR", "REPORTED"};
+typedef enum {alarm_off=0,alarm_disarmed=1,alarm_armed=2,alarm_tripped=3,alarm_notifying=4,alarm_clearing=5,alarm_reported=6,remotes_enabled=7,remotes_disabled=8};
+const char* alarm_state_name_def[9] = {"SYSTEM OFF", "DISARMED", "ARMED", "TRIPPED", "NOTIFY", "CLEAR", "REPORTED","REM-ENA","REM_DIS"};
+const char alarm_state_short[9] = {'F','D','A','T','N','C','R','X','O'};
 typedef enum {AT_HOME=0, AWAY=1};
 const char* alarm_state_location_def[2] = {"HOME", "AWAY"};
 typedef enum {LED_OFF, LED_SOLID, LED_SLOW, LED_FAST};
@@ -57,6 +58,7 @@ public:
   //new: set state -- state machine
   int setState();
   uint8_t getState();
+  //uint8_t getbaseState();
   String getStateDescription();
   String getStateDescription(uint8_t);
   bool readSavedState();
@@ -66,6 +68,7 @@ public:
   bool writeTestConfiguration();
   bool updateConfiguration(device_t* dev, int n);
   uint8_t buildDeviceList();
+  void setValidNonWire();
   void dump_device_list();
   bool validate_device_list();
   char* deviceListing(char *buf);
@@ -86,7 +89,7 @@ public:
   bool alarmNotifying();
   String getPendingMessage();
   uint8_t getPriority();
-  bool checkSensors(void);
+  bool checkSensors(bool);
   String getLastTemperature();  //testing
   bool clearSensorReported();
   bool allClear();
@@ -94,8 +97,8 @@ public:
   device_t* getDevice(uint8_t); //v0.1.6
   device_t* getDeviceByUse(uint8_t); //v0.1.6
   bool setLastRemote(uint8_t, float);
-  bool setAlarmRemote(uint8_t, float);
-  void setDeviceActive(device_t *d, bool);
+  bool setAlarmRemote(uint8_t, uint8_t, uint8_t, float);
+  //void setDeviceActive(device_t *d, bool);
   void setDeviceAlertMin(device_t *d, int p3);
   void setDeviceAlertMax(device_t *d, int p3);
   float readTemperature(uint8_t); //read by device idx
@@ -107,12 +110,17 @@ public:
   int ackEvent(int);
   int removeEvent(int);
   bool eventsClear();
-
+  void setRemotes(uint8_t);
+  void tellRemote(uint8_t, char);
+#ifdef PHOTON_REMOTE
+  void setLEDRemote(char);
+#endif
 private:
   void setStatusLED();
   config_t configuration;
   config_t *p_config;
   uint8_t curState;
+  uint8_t baseState;  // {off,disarmed,armed}
   uint8_t curLocation;
   device_t device;      //who is this guy ????
   std::list<device_t> device_list;
@@ -125,6 +133,7 @@ private:
   String message;  //??name
   uint8_t priority;
   String trippedString;
+  int ledNoticeState;
   int ledStatusState;
   int ledStatusBlink;                       // 0=solid,1=slow blink,2=fast blink
   int ledStatusBlinkCount;

@@ -32,21 +32,24 @@
 #define HALT while(1)
 //TO DO: reorder these so > xx = always present ??
 // dev_use >= SUB_REMOTE_THERMOMETER is REMOTE device
-typedef enum {UNDEFINED=0, USER_KEY=1, MASTER_KEY=2, SWITCH=3, OW_SENSOR=4, OW_INDICATOR=5, OW_RELAY=6, OW_THERMOMETER=7,
-              MCP9808_THERMOMETER=8, SUB_REMOTE_THERMOMETER=9, SUB_REMOTE_SENSOR=10, SUB_OIL_GAUGE=11, SUB_CAR_MONITOR=12} SENSOR_TYPE;
-typedef enum {HOME_DEVICE=0, AWAY_DEVICE=1} ;
-typedef enum {DEV_MISSING=0, DEV_PRESENT=1, DEV_UNKNOWN=2};
+// check for DEV_PRESENT if idx < 8
+typedef enum {UNDEFINED=0, USER_KEY=1, MASTER_KEY=2, OW_SENSOR=3, OW_INDICATOR=4, OW_RELAY=5, OW_THERMOMETER=6,
+              MCP9808_THERMOMETER=7, SWITCH=8, IO_SENSOR=9, SUB_REMOTE_THERMOMETER=10, SUB_REMOTE_SENSOR=11, SUB_OIL_GAUGE=12, SUB_CAR_MONITOR=13, SUB_SET_DEVICE=14} SENSOR_TYPE;
+#define FIRST_SUB_REMOTE 10
+#define FIRST_NON_WIRE 7
+typedef enum {HOME_DEVICE=0, AWAY_DEVICE=1, ALWAYS_DEVICE=2} ;
+typedef enum {DEV_MISSING=0, DEV_PRESENT=1, DEV_ERROR_UNKNOWN};
 typedef enum {SENSOR_DISABLED=0, SENSOR_ACTIVE=1, SENSOR_INACTIVE=2};
 typedef enum {SENSOR_CLEAR, SENSOR_TRIPPED, SENSOR_RESET, SENSOR_STILL_TRIPPED};
 typedef enum {SENSE_NORMAL_CLOSED=0, SENSE_NORMAL_OPEN=1};
 const char* sensor_status_def[3] = {"missing", "present", "unknown"};
 const char* sensor_state_def[3] = {"deactivated", "active","inactive"};
-const char* sensor_use_def[12] = {"undefined","user key", "master key","switch","ow switch","ow indicator","ow relay","ow thermometer",
-          "mcp9808 therm", "remote alarm", "oil level", "remote monitor"};
+const char* sensor_use_def[] = {"undefined","user key", "master key","ow switch","ow indicator","ow relay","ow thermometer",
+          "mcp9808 therm","switch","port switch","remote thermometer","remote alarm", "oil level", "remote monitor", "remote set device"};
 const char* sensor_sense_def[2] = {"normal closed", "normal open"};
 const char* sensor_level_def[2] = {"home", "away"};
-const char* sensor_use_descr[] = {"undefined","user-key","master-key","switch", "ow-sensor","ow-indicator","ow-relay","ow-thermometer",
-              "mcp9808-thermometer","sub-remote-therm","sub-remote-alarm","sub-oil-level","remote car monitor" };
+const char* sensor_use_descr[] = {"undefined","user-key","master-key","ow-sensor","ow-indicator","ow-relay","ow-thermometer",
+              "mcp9808-thermometer","switch","hdw-port-sensor","sub-remote-therm","sub-remote-alarm","sub-oil-level","remote-car-monitor","remote-set-device" };
 //device flag bit definitions
 //YELLOW = caution state, i.e. oil level warning; RED = critical state, i.e. OIL critically low
 typedef enum {DEVICE_PRIORITY=0, DEVICE_YELLOW=1, DEVICE_RED=2};
@@ -56,6 +59,7 @@ struct state_t
   uint8_t magic;
   uint8_t current_state;
   uint8_t current_location;
+  uint8_t remote_state;   //sys.remoteStatus bitmask
   int event_sequence;
   uint8_t alert_hours;
   float oil_gallons; // or level ??
@@ -102,6 +106,7 @@ typedef struct device_t
     String name;
     uint8_t tripped;      //checkSensor says tripped
     uint8_t reported;     //reported by alert
+    uint8_t changed;      //changed since last read
 };
 
 //just use put(address, object)

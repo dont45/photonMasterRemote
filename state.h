@@ -44,9 +44,14 @@ public:
   State();
   void sysState(uint8_t);
   uint8_t sysStatus();
+  void setRemoteStatus(uint8_t, bool);
+  bool getRemoteStatus(uint8_t);
+  void setRemotes(uint8_t);
+  uint8_t getRemotes();
   void setSysId(uint8_t);
   uint8_t getSysId();
   void addStatus(uint8_t);
+  bool owPresent();
   char* upTime(char *);
   int upTime();
 private:
@@ -54,6 +59,7 @@ private:
   int ledNoticeState = 0;
   uint8_t curState;
   uint8_t status;
+  uint8_t remoteStatus; //bit-mask of remote nodes
   int startTime;
 };
 #endif
