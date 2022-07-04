@@ -32,27 +32,27 @@
 #define HALT while(1)
 //TO DO: reorder these so > xx = always present ??
 // dev_use >= SUB_REMOTE_THERMOMETER is REMOTE device
-// check for DEV_PRESENT if idx < 8
+// check for DEV_PRESENT if idx < 10
 typedef enum {UNDEFINED=0, USER_KEY=1, MASTER_KEY=2, OW_SENSOR=3, OW_INDICATOR=4, OW_RELAY=5, OW_THERMOMETER=6,
               MCP9808_THERMOMETER=7, SWITCH=8, IO_SENSOR=9, SUB_REMOTE_THERMOMETER=10, SUB_REMOTE_SENSOR=11, SUB_OIL_GAUGE=12, SUB_CAR_MONITOR=13, SUB_SET_DEVICE=14} SENSOR_TYPE;
 #define FIRST_SUB_REMOTE 10
 #define FIRST_NON_WIRE 7
-typedef enum {HOME_DEVICE=0, AWAY_DEVICE=1, ALWAYS_DEVICE=2} ;
-typedef enum {DEV_MISSING=0, DEV_PRESENT=1, DEV_ERROR_UNKNOWN};
-typedef enum {SENSOR_DISABLED=0, SENSOR_ACTIVE=1, SENSOR_INACTIVE=2};
-typedef enum {SENSOR_CLEAR, SENSOR_TRIPPED, SENSOR_RESET, SENSOR_STILL_TRIPPED};
-typedef enum {SENSE_NORMAL_CLOSED=0, SENSE_NORMAL_OPEN=1};
+enum {HOME_DEVICE=0, AWAY_DEVICE=1, ALWAYS_DEVICE=2} ;
+enum {DEV_MISSING=0, DEV_PRESENT=1, DEV_ERROR_UNKNOWN};
+enum {SENSOR_DISABLED=0, SENSOR_ACTIVE=1, SENSOR_INACTIVE=2};
+enum {SENSOR_CLEAR, SENSOR_TRIPPED, SENSOR_RESET, SENSOR_STILL_TRIPPED};
+enum {SENSE_NORMAL_CLOSED=0, SENSE_NORMAL_OPEN=1};
 const char* sensor_status_def[3] = {"missing", "present", "unknown"};
 const char* sensor_state_def[3] = {"deactivated", "active","inactive"};
 const char* sensor_use_def[] = {"undefined","user key", "master key","ow switch","ow indicator","ow relay","ow thermometer",
           "mcp9808 therm","switch","port switch","remote thermometer","remote alarm", "oil level", "remote monitor", "remote set device"};
 const char* sensor_sense_def[2] = {"normal closed", "normal open"};
-const char* sensor_level_def[2] = {"home", "away"};
+const char* sensor_level_def[] = {"home", "away", "always"};
 const char* sensor_use_descr[] = {"undefined","user-key","master-key","ow-sensor","ow-indicator","ow-relay","ow-thermometer",
               "mcp9808-thermometer","switch","hdw-port-sensor","sub-remote-therm","sub-remote-alarm","sub-oil-level","remote-car-monitor","remote-set-device" };
 //device flag bit definitions
 //YELLOW = caution state, i.e. oil level warning; RED = critical state, i.e. OIL critically low
-typedef enum {DEVICE_PRIORITY=0, DEVICE_YELLOW=1, DEVICE_RED=2};
+enum {DEVICE_PRIORITY=0, DEVICE_YELLOW=1, DEVICE_RED=2, DEVICE_REMOTE=3};
 
 struct state_t
 {
@@ -73,6 +73,7 @@ alarm_saved_state;
 struct config_t
 {
   uint8_t magic;
+  uint8_t sys_id[MAXDEVICE];
   uint8_t dev_addr[MAXDEVICE][8];
   uint8_t dev_flags[MAXDEVICE];
   uint8_t port[MAXDEVICE];
@@ -87,14 +88,20 @@ struct config_t
 
 //device config in runnint std::list (running)
 //ADD alert-level to trip e.g. alert for thermometer
-typedef struct device_t
+//converting to one device definition for both master and remote
+struct device_t
 {
     uint8_t idx;          // index: v0.1.6
-    uint8_t master_idx;   // idx on REMOTE
+    //change master_id to:
+    //bool is_master;     // else remote
+    //bool has_remote;    // how to implement ??
+    uint8_t sys_id;       // system number for this sensor
+    uint8_t master_idx;   // idx on REMOTE, now just idx (fix/remove)
     uint8_t status;       // missing, present, unknown
     uint8_t dev_flags;    //
     uint8_t state;        //disabled, active
 		uint8_t dev_rom[8];
+    //port and dev_use will be set according to master/remote
     uint8_t port;         //PIO-A==0, PIO-B==1
     uint8_t dev_use;
     uint8_t sense;        //sensor NC or NO
@@ -102,7 +109,7 @@ typedef struct device_t
     uint8_t alert_min;    // 0 ==> no alert_point, <= this ==> do alert
     uint8_t alert_max;    // 0 ==> no alert_point, >= this ==> do alert
     float dev_reading;    //last PIO, temp, etc.
-    int dev_last_read;    //timestamp of last reading
+    system_tick_t dev_last_read;    //timestamp of last reading
     String name;
     uint8_t tripped;      //checkSensor says tripped
     uint8_t reported;     //reported by alert
@@ -113,7 +120,7 @@ typedef struct device_t
 template <class T> int EEPROM_writeAnything(int ee, const T& value)
 {
   const byte* p = (const byte*)(const void*)&value;
-  int i;
+  unsigned int i;
   for (i = 0; i < sizeof(value); i++)
     EEPROM.write(ee++, *p++);
   return i;

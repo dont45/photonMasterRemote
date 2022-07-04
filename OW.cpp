@@ -66,7 +66,7 @@ uint8_t OW::readStatus(uint8_t *ROM, uint8_t *buf)
 
 uint8_t OW::writeStatus(uint8_t *ROM, uint8_t status)
 {
-    uint8_t crc1, crc2;
+//   uint8_t crc1, crc2;
     bool ok;
     // should verify family here ??
     wireReset();
@@ -76,20 +76,21 @@ uint8_t OW::writeStatus(uint8_t *ROM, uint8_t status)
     wireWriteByte(0x07);	// write just the status byte
     wireWriteByte(0x00);
     wireWriteByte(status);
-    crc1=wireReadByte();
-    crc2=wireReadByte();
+//    crc1=wireReadByte();
+//    crc2=wireReadByte();
 //    serial->print("writeStatus: crc=");
 //    serial->print(crc1,HEX);
 //    serial->println(crc2,HEX);
     ok = true;			// calc crc and compare to set ok
     if(ok) wireWriteByte(0xFF);
     else wireReset();
+    return ok;      // ?? this return was missing??
 }
 
 // This should be called channelAccess
 uint8_t OW::channelAccess(uint8_t *ROM, uint8_t channel_control, uint8_t *buf)
 {
-
+    return true;
 }
 
 // read channel info byte into buf
@@ -105,7 +106,6 @@ uint8_t OW::channelAccess(uint8_t *ROM, uint8_t channel_control, uint8_t *buf)
 uint8_t OW::readChannel(uint8_t *ROM, uint8_t *buf)
 {
     uint8_t channel_control = 0x48;	// 0 1 0 0 1 0 0 0
-    int i;
     wireReset();
   #ifdef SERIAL_DEBUG_OW
     Serial.print("OW::readChannel: ");
@@ -332,7 +332,7 @@ uint8_t OW::readPIOX(uint8_t *ROM, uint8_t port) {
     default:
         #ifdef SERIAL_DEBUGXX
           Serial.print(" NO FMLY=");
-          Serial.println(ROM[0]);
+          Serial.println(ROM[0],HEX);
           #endif
           return 0;
   }

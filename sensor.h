@@ -46,6 +46,9 @@ public:
   }
   bool readSensor(device_t &d);
   void setDeviceActive(device_t *d, bool);
+  void setDeviceStatus(device_t d, bool);
+  void setDeviceLevel(device_t *d, uint8_t newLevel);
+  void setDeviceSense(device_t *d, uint8_t newSense);
   void setSensorIndicator(device_t d, uint8_t val);
   float readTemperature();
   float getLastTemperature();

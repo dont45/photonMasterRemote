@@ -85,7 +85,7 @@ public:
 	void wireSkip();
 
 	uint8_t hasTimeout() { return mTimeout; }
-#if ONEWIRE_SEARCH
+#ifdef ONEWIRE_SEARCH
     // Clear the search state so that if will start from the beginning again.
     void wireResetSearch();
 
@@ -104,7 +104,7 @@ public:
     uint8_t wireMatchRom(uint8_t *ROM);
     uint8_t status() { return statusByte; };
     bool ppd() { return statusByte & DS2482_STATUS_PPD ? true : false; };
-#if ONEWIRE_CRC
+#ifdef ONEWIRE_CRC
     // Compute a Dallas Semiconductor 8 bit CRC, these are used in the
     // ROM and scratchpad registers.
     static uint8_t crc8( uint8_t *addr, uint8_t len);
@@ -123,14 +123,14 @@ protected:
 	void begin();
 	void end();
 
-#if ONEWIRE_SEARCH
+#ifdef ONEWIRE_SEARCH
 	uint8_t searchType;
 	uint8_t searchAddress[8];
 	int8_t searchLastDiscrepancy;
 	uint8_t searchExhausted;
 #endif
 
-#if DEBUG_SERIAL_REMOVED
+#ifdef DEBUG_SERIAL_REMOVED
 	// Search State
 	int LastDiscrepancy;
         int LastFamilyDiscrepancy;

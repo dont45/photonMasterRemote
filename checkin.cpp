@@ -32,13 +32,22 @@ Checkin::Checkin(unsigned long hours) {
   //hours_to_checkin = 0b000010000000000010000000;  //7am  7pm
   hours_to_checkin = hours;
   if(!hours_to_checkin)
-    hours_to_checkin = 0b000010000000000010000000;  //10am 2pm 7pm
+    hours_to_checkin = 0b000000000000000000000000;  //10am 2pm 7pm
 
   checkin_time = Time.now() + TIME_BETWEEN_CHECKIN;
   panic_time = 0;  // zero means NOT set
   notice_time = 0;
   suspend_until = 0;
   in_panic = 0;
+}
+
+//disable all checkin activity--to be developed further
+void Checkin::disable() {
+  disabled = TRUE;
+}
+
+void Checkin::enable() {
+  disabled = FALSE;
 }
 
 //TODO: return true if checkin was on-time, else false
@@ -50,6 +59,7 @@ void Checkin::userCheckin() {
 //check if hour h is set in bitmask
 bool Checkin::checkinThisHour(uint8_t h) {
   unsigned long hours = (hours_to_checkin >> h);
+  if(disabled) return FALSE;
   return hours & 1;
 }
 
@@ -85,6 +95,7 @@ void Checkin::addCheckinHour(int h) {
 }
 
 bool Checkin::timeExpired() {
+  if(disabled) return FALSE;
   if(!checkin_time) return FALSE;
   if(suspend_until > Time.now()) {
     checkin_time = suspend_until;
@@ -148,7 +159,10 @@ unsigned long Checkin::getCheckinHours() {
 String Checkin::showCheckinTime() {
   String nextAt("\ncheckin_time ");
   //Serial.print("next checkin at: ");
-  if(checkin_time)
+  if(disabled){
+    nextAt += "disabled\n";
+  }
+  else if(checkin_time)
     nextAt += Time.format(checkin_time, TIME_FORMAT_DEFAULT);  //03:21AM
   else
     nextAt += "not set";
@@ -173,7 +187,7 @@ String Checkin::showNoticeTime() {
   else
     //nextPt += "not set";
     nextPt = "";
-    return nextPt;
+  return nextPt;
 }
 //show hours_to_checkin as 7am,10am,8pm
 String Checkin::showCheckinHours() {

@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  #include <list>
  #include <map>
 
-typedef enum {NO_HEADER=0, SHORT_HEADER=1, FULL_HEADER=2};
+enum {NO_HEADER=0, SHORT_HEADER=1, FULL_HEADER=2};
 //Message name conflicts with
 struct pMessage {
   uint8_t header_style;
@@ -46,11 +46,6 @@ struct pMessage {
  public:
    Notifier(char *lopri_event_name, char *event_name, char *priority_event_name, char *emergency_event_name, Sensor *s) {
      // move upd to Alarm class ??
-     Particle.function("upd", &Notifier::upd, this);
-     //Particle.function("set", &Notifier::set, this);  //old xxxxyy, remove
-     Particle.function("request", &Notifier::request, this);
-     Particle.function("confirm", &Notifier::confirm, this);
-     //Particle.function("dump", &Notifier::dump, this); xxxxyy
      //TODO use array for webhook_id
      strcpy(low_pri_webhook_id, lopri_event_name);
      strcpy(webhook_id, event_name);
@@ -65,13 +60,14 @@ struct pMessage {
      hours_between_alert = ALERT_HOURS;
      digitalWrite(MESSAGE_PIN, LOW);
    }
-   int upd(String command);
+   void setup();
+   int status(String command);
    int set(String);
    String updData();
+   int setAlarm(String);
    int request(String);
    int confirm(String);
    int do_command(String);
-   //int dump(String); xxxxyy
    void sendMessage(uint8_t header, int priority, char* msg);  //send message to pushover
    void sendMessage(uint8_t, int, String);
    void queueMessage(uint8_t, int, String);    //add message to queue

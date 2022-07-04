@@ -49,12 +49,14 @@ public:
   void setDelimiters(char, char);
   String getData();
   String getElement(int);
+  String el1, el2, el3, el4;
 private:
   int findDelim(char, int);
   int parseNext(int, int);
 
   String remotedata;
   String element[MAX_PARSED_ITEMS];
+
   int parsePos;
   int idx;
   char elementDelimiter;

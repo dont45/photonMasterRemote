@@ -42,6 +42,8 @@ public:
   void setCheckinTime(int);
   //void setPanicTime(int);
   //void setNoticeTime(int);
+  void disable();
+  void enable();
   void setPanicMode();
   bool inPanicMode();
   void userCheckin();     // perform user checkin
@@ -60,6 +62,7 @@ public:
   String showPanicTime();
   String showNoticeTime();
 private:
+  bool disabled;
   unsigned long hours_to_checkin;  //bitmask of hours
   //zero means NOT set, else Time until event:
   int checkin_time; //time until checkin request sent

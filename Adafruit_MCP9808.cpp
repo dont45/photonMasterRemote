@@ -40,13 +40,13 @@ Adafruit_MCP9808::Adafruit_MCP9808() {
 uint16_t Adafruit_MCP9808::begin(uint8_t addr) {
   _i2caddr = addr;
   Wire.begin();
-  #ifdef SERIAL_DEBUG
+  #ifdef SERIAL_DEBUG_I2C
   Serial.println("Wire.begin() ok");
   #endif
   uint16_t rval;
   rval = read16(MCP9808_REG_MANUF_ID);
   if (rval != 0x0054) {
-#ifdef SERIAL_DEBUG
+#ifdef SERIAL_DEBUG_I2C
     Serial.print("REG_MANUF_ID:");
     Serial.println(rval);
 #endif
@@ -54,12 +54,15 @@ uint16_t Adafruit_MCP9808::begin(uint8_t addr) {
   }
   rval = read16(MCP9808_REG_DEVICE_ID);
   if (rval != 0x0400) {
-#ifdef SERIAL_DEBUG
+#ifdef SERIAL_DEBUG_I2C
     Serial.print("DEVICE_ID:");
     Serial.println(rval);
 #endif
     return rval;
   }
+#ifdef SERIAL_DEBUG_I2C
+  Serial.println("MCP9808 REG SPECS PASSED");
+#endif
   return 0;
 }
 
@@ -73,7 +76,10 @@ uint16_t Adafruit_MCP9808::begin(uint8_t addr) {
 float Adafruit_MCP9808::readTempC( void )
 {
   uint16_t t = read16(MCP9808_REG_AMBIENT_TEMP);
-
+  #ifdef SERIAL_DEBUG_I2C
+    Serial.print("mcp9808.readTempC=");
+    Serial.println(t);
+  #endif
   float temp = t & 0x0FFF;
   temp /=  16.0;
   if (t & 0x1000) temp -= 256;
@@ -136,14 +142,24 @@ void Adafruit_MCP9808::write16(uint8_t reg, uint16_t value) {
 
 uint16_t Adafruit_MCP9808::read16(uint8_t reg) {
   uint16_t val;
-
+  #ifdef SERIAL_DEBUG_I2C
+    Serial.println("mcp9808.read16");
+  #endif
   Wire.beginTransmission(_i2caddr);
   Wire.write((uint8_t)reg);
   Wire.endTransmission();
 
   Wire.requestFrom((uint8_t)_i2caddr, (uint8_t)2);
   val = Wire.read();
-  val <<= 8;
+ #ifdef SERIAL_DEBUG_I2C
+    Serial.print("val1:");
+    Serial.print(val);
+  #endif
+   val <<= 8;
   val |= Wire.read();
+  #ifdef SERIAL_DEBUG_I2C
+    Serial.print(" val2:");
+    Serial.println(val);
+  #endif
   return val;
 }

@@ -32,21 +32,23 @@
 #include "application.h"
 #include "parms.h"
 
-typedef enum {sys_undefined=0, sys_starting=1,sys_configure=2,sys_fail=3,sys_running=4};
+enum {sys_undefined=0, sys_starting=1,sys_configure=2,sys_fail=3,sys_running=4};
 //sys status bit definitions:
 // 1 == HDW FAIL
 // 2 == DS2482
 // 4 == EEPROMCFG
 // 8 == OWDEVICE
-typedef enum {fail_hardware=1, fail_ds2482=2, fail_eeprom=4, fail_owdevice=8};
+enum {fail_hardware=1, fail_ds2482=2, fail_eeprom=4, fail_owdevice=8};
 class State {
 public:
   State();
   void sysState(uint8_t);
   uint8_t sysStatus();
-  void setRemoteStatus(uint8_t, bool);
+  void setRemoteStatus(uint8_t remoteId, bool newState); 
   bool getRemoteStatus(uint8_t);
   void setRemotes(uint8_t);
+  void setRemoteName(uint8_t, String);
+  String getRemoteName(uint8_t);
   uint8_t getRemotes();
   void setSysId(uint8_t);
   uint8_t getSysId();
@@ -60,6 +62,7 @@ private:
   uint8_t curState;
   uint8_t status;
   uint8_t remoteStatus; //bit-mask of remote nodes
+  String remoteNames[8];
   int startTime;
 };
 #endif

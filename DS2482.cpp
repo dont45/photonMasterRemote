@@ -351,7 +351,8 @@ uint8_t DS2482::wireSearch(uint8_t *newAddr)
 		{
 #if DEBUG_WIRESEARCH
 			Serial.print(" point 1");
-#endif			return 0;
+#endif			
+			return 0;
 		}
 		else
 		{
@@ -421,7 +422,7 @@ uint8_t DS2482::wireSearch(uint8_t *newAddr)
 uint8_t DS2482::wireMatchRom(uint8_t *ROM)
 {
 	uint8_t tc;
-	uint8_t i,j;
+	//uint8_t i,j;
 	wireReset();			// Added this reset ????
         wireSelect(ROM);
 // ?? Do we need waitBusy() here ?? I don't think so...this is read of bus, not DS2482??
@@ -457,7 +458,7 @@ uint8_t DS2482::crc8( uint8_t *addr, uint8_t len)
 
 #endif
 
-#if MY_MODS_MOVED
+#ifdef MY_MODS_MOVED
 
 // read status block (8 bytes + crc) into buf
 // device = ds2406

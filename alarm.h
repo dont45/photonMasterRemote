@@ -33,12 +33,12 @@
 // Alarm states xxx  FIX:???
 // need two states: alarm_state; DISARMED, armed
 // and sensor_state: clear, tripped, notified
-typedef enum {alarm_off=0,alarm_disarmed=1,alarm_armed=2,alarm_tripped=3,alarm_notifying=4,alarm_clearing=5,alarm_reported=6,remotes_enabled=7,remotes_disabled=8};
-const char* alarm_state_name_def[9] = {"SYSTEM OFF", "DISARMED", "ARMED", "TRIPPED", "NOTIFY", "CLEAR", "REPORTED","REM-ENA","REM_DIS"};
-const char alarm_state_short[9] = {'F','D','A','T','N','C','R','X','O'};
-typedef enum {AT_HOME=0, AWAY=1};
+enum {alarm_off=0,alarm_disarmed=1,alarm_armed=2,alarm_tripped=3,alarm_notifying=4,alarm_clearing=5,alarm_reported=6,remotes_enabled=7,remotes_disabled=8,remotes_query=9};
+const char* alarm_state_name_def[10] = {"SYSTEM OFF", "DISARMED", "ARMED", "TRIPPED", "NOTIFY", "CLEAR", "REPORTED","REM-ENA","REM_DIS","REM_QRY"};
+const char alarm_state_short[10] = {'F','D','A','T','N','C','R','X','O','Q'};
+enum {AT_HOME=0, AWAY=1};
 const char* alarm_state_location_def[2] = {"HOME", "AWAY"};
-typedef enum {LED_OFF, LED_SOLID, LED_SLOW, LED_FAST};
+enum {LED_OFF, LED_SOLID, LED_SLOW, LED_FAST};
 
 class Alarm {
 public:
@@ -58,7 +58,8 @@ public:
   //new: set state -- state machine
   int setState();
   uint8_t getState();
-  //uint8_t getbaseState();
+  uint8_t getLocation();
+  uint8_t getbaseState();
   String getStateDescription();
   String getStateDescription(uint8_t);
   bool readSavedState();
@@ -120,7 +121,7 @@ private:
   config_t configuration;
   config_t *p_config;
   uint8_t curState;
-  uint8_t baseState;  // {off,disarmed,armed}
+  uint8_t baseState;    // {off,disarmed,armed}
   uint8_t curLocation;
   device_t device;      //who is this guy ????
   std::list<device_t> device_list;

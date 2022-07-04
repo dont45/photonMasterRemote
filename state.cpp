@@ -21,6 +21,8 @@
 #include "state.h"
 
 State::State(){
+    //Can't do here .. sos error ???
+    //Particle.variable("remoteStatus", remoteStatus);
     status = 0;
     remoteStatus = 0;   // DESIGN: read from eeprom ??
     ledNoticeState = 0;
@@ -30,7 +32,25 @@ State::State(){
 void State::sysState(uint8_t current) {
   int notificationLED;
   curState = current;
+  //debug starting state changes
+  for(int k=0; k<10; k++) {
+      digitalWrite(SYSTEM_NOTIFICATION_PIN, HIGH);
+      digitalWrite(SYSTEM_STATUS_PIN, HIGH);
+      delay(500);
+      digitalWrite(SYSTEM_NOTIFICATION_PIN, LOW);
+      digitalWrite(SYSTEM_STATUS_PIN, LOW);
+      delay(500);
+  }
   switch(current) {
+    case sys_undefined:
+    #ifdef SERIAL_DEBUG
+        Serial.print("sys_undefined ");
+        Serial.println("SYSTEM_VERSION");
+    #endif
+        digitalWrite(SYSTEM_NOTIFICATION_PIN, LOW);
+        digitalWrite(SYSTEM_STATUS_PIN, LOW);
+        digitalWrite(TRIGGER_PIN, LOW);
+        break;
     case sys_starting:
     #ifdef SERIAL_DEBUG
         Serial.print("sys_starting ");
@@ -96,7 +116,8 @@ int State::upTime() {
 }
 //calculate and format system up-time as dd hh:mm
 char* State::upTime(char* upTimeStr) {
-  int now,uptime,uptimeH,uptimeM;
+  // int now;
+  int uptime,uptimeH,uptimeM;
   int updays,uphours,upminutes,upseconds;
 
   //now = Time.now();
@@ -118,8 +139,21 @@ void State::setRemoteStatus(uint8_t remoteId, bool newState) {
   else
     remoteStatus &= ~(1 << remoteId);
 }
+
 bool State::getRemoteStatus(uint8_t remoteId) {
   return (remoteStatus >> remoteId) & 1;
+}
+
+//FIX: not needed since config builds from common def
+void State::setRemoteName(uint8_t id, String name)  {
+  if(id >= 0 && id <= 7) {
+    remoteNames[id] = name;
+  }
+}
+
+String State::getRemoteName(uint8_t id) {
+  if(id < 0 || id > 7) return "";
+ return remoteNames[id];
 }
 
 void State::setSysId(uint8_t id) {
